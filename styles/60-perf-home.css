@@ -18,11 +18,11 @@
 
 
 /* [LAYOUT] Десктоп-стиль: явно обмежений атрибутом, щоб не впливати на мобайл. */
-@media (min-width: 900px) {
-  html[data-layout="desktop"] #overlay #card.is-person .card-scroll {
+
+  #overlay #card.is-person .card-scroll {
     padding: 72px 40px 40px;
   }
-}
+
 
 .person-lib-badge {
   display: inline-block;
@@ -140,12 +140,12 @@ input#q::-webkit-search-cancel-button {
 }
 
 /* [LAYOUT] Десктоп-стиль: явно обмежений атрибутом, щоб не впливати на мобайл. */
-@media (min-width: 900px) {
-  html[data-layout="desktop"] body #results > .taste-summary-container.is-expanded {
+
+  body #results > .taste-summary-container.is-expanded {
     flex: 0 0 100%;
     max-width: 100%;
   }
-}
+
 
 
 /* ========================================================= */
@@ -159,31 +159,10 @@ input#q::-webkit-search-cancel-button {
 }
 
 /* Мобільний: горизонтальний скрол + видимий скролбар */
-@media (max-width: 899px) {
-    html[data-layout="mobile"] .mood-pills {
-        overflow-x: auto;
-        overflow-y: hidden;
-        -webkit-overflow-scrolling: touch;
-        padding-bottom: 8px;
-        scrollbar-width: thin;
-        scrollbar-color: var(--accent) rgba(var(--white-rgb), .05);
-    }
-    html[data-layout="mobile"] .mood-pills::-webkit-scrollbar {
-        display: block;
-        height: 4px;
-    }
-    .mood-pills::-webkit-scrollbar-thumb {
-        background: var(--accent);
-        border-radius: 2px;
-    }
-    .mood-pills::-webkit-scrollbar-track {
-        background: rgba(var(--white-rgb), .05);
-        border-radius: 2px;
-    }
-}
+
 
 /* Десктоп: один рядок, поступове зменшення відступів */
-@media (min-width: 900px) and (min-height: 600px) {
+
     body #results .mood-pills {
         flex-wrap: nowrap; /* СУВОРО ОДИН РЯДОК */
         height: 44px;
@@ -208,6 +187,6 @@ input#q::-webkit-search-cancel-button {
         gap: clamp(2px, 0.5vw, 6px);
         flex-shrink: 0; /* Не стискаємо самі плитки, але вони самі зменшуються */
     }
-}
+
 
 

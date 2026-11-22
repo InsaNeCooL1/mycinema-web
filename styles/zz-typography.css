@@ -1,0 +1,33 @@
+/* ========================================================= */
+/* Типографіка: Geist скрізь, Cormorant для назв/логотипа     */
+/* ========================================================= */
+
+/* Щільні заголовки — фірмовий прийом Apple */
+h1, h2,
+.home-hero-title,
+.section-title,
+.rail-head .section-title,
+.title-main,
+.hero-title,
+.auth-box h2, .settings-box h2 {
+  letter-spacing: -.025em;
+  line-height: 1.08;
+}
+
+/* Табличні цифри без моноширинного шрифту */
+.rating, .score, .meta-row, .stats-grid,
+.row-meta, .section-sub, .hp-meta, .hp-own,
+.score-val, .score-total-val, .score-total-label,
+.rec-match, .rec-badge,
+.sidebar-email,
+.title-meta, .meta-ratings-wrap,
+.card-info-block .detail-value,
+.hero-meta, .home-hero-meta,
+.stat-value, .stat-label {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Логотип і назви фільмів — легка театральність */
+.sidebar-logo { font-family: var(--serif); font-style: italic; font-weight: 700; }
+.title-main { font-family: var(--sans); font-weight: 800; }
+.home-hero-title { font-family: var(--sans); font-weight: 800; }

@@ -49,7 +49,7 @@
 .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 16px 12px; }
 .rec-card { cursor: pointer; min-width: 0; position: relative; }
 .rec-poster { width: 100%; height: auto; aspect-ratio: 2/3; object-fit: cover; border-radius: 12px; background: var(--bg-3); display: block; box-shadow: 0 4px 16px rgba(0, 0, 0, .3); }
-@media (hover: hover) { .rec-card { transition: transform .2s; } .rec-card:hover { transform: translateY(-2px); } .rec-card:hover .rec-poster { box-shadow: 0 8px 24px rgba(var(--accent-rgb), .15); } }
+ .rec-card { transition: transform .2s; } .rec-card:hover { transform: translateY(-2px); } .rec-card:hover .rec-poster { box-shadow: 0 8px 24px rgba(var(--accent-rgb), .15); } 
 .row-title { font-size: 12.5px; margin-top: 8px; line-height: 1.3; font-weight: 500; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .row-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-family: var(--mono); }
 .rec-why { font-size: 10.5px; color: var(--accent); margin-top: 4px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-style: italic; opacity: .9; }

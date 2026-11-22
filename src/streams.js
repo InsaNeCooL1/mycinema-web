@@ -508,14 +508,6 @@
   // ─── Fullscreen & Back helpers ───
   function setNativeFullscreen(enabled) {
     document.body.classList.toggle('mc-fs', !!enabled);
-    try {
-      var ep = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ExternalPlayer;
-      if (ep && typeof ep.setFullscreen === 'function') ep.setFullscreen({ enabled: !!enabled }).catch(function () {});
-    } catch (e) {}
-    try {
-      if (enabled && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function () {});
-      else if (!enabled && screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
-    } catch (e) {}
   }
 
   function toggleElementFullscreen(targetEl) {
@@ -572,8 +564,7 @@
 
   var _streamsHistoryActive = false;
   function ensureStreamsHistoryGuard() {
-    var isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-    if (isNative || _streamsHistoryActive) return;
+    if (_streamsHistoryActive) return;
     _streamsHistoryActive = true;
     var curMc = (history.state && history.state.mc) || 0;
     history.pushState({ mc: curMc, mcStreams: 1 }, '', location.href);
@@ -655,15 +646,6 @@
     ov._resumeKey = meta.resumeKey || '';
     ov._onClosed = meta.onClosed || null;
     ov.style.cssText = 'position:fixed;inset:0;height:100dvh;width:100vw;background:#000;z-index:10000;display:flex;flex-direction:column;overflow:hidden;';
-
-    var epPlugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ExternalPlayer;
-    function openExternal() {
-      if (!epPlugin || typeof epPlugin.open !== 'function') return;
-      video.pause();
-      epPlugin.open({ url: url, title: meta.title || 'MyCinema' }).catch(function () {
-        if (typeof showSyncToast === 'function') showSyncToast('⚠ Зовнішній плеєр не знайдено');
-      });
-    }
 
     var videoWrap = document.createElement('div');
     videoWrap.style.cssText = 'flex:1;position:relative;min-height:0;min-width:0;background:#000;overflow:hidden;';
@@ -841,8 +823,7 @@
         title: meta.title || 'MyCinema',
         onBack: closeVideoOverlay,
         onMenu: overlay && overlay.hasOptions() ? function () { overlay.toggle(); } : null,
-        onFullscreen: function () { toggleElementFullscreen(ov); },
-        onExternal: epPlugin && typeof epPlugin.open === 'function' ? openExternal : null
+        onFullscreen: function () { toggleElementFullscreen(ov); }
       });
       updateTitle(currentVariant);
     }
@@ -857,7 +838,7 @@
 
     var bar = document.createElement('div');
     bar.setAttribute('data-role', 'video-bar');
-    bar.style.cssText = 'padding:calc(8px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 8px calc(14px + env(safe-area-inset-left));background:var(--bg-1);display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;';
+    bar.style.cssText = 'padding:8px 14px;background:var(--bg-1);display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;';
 
     var backBtn = document.createElement('button');
     backBtn.type = 'button';
@@ -1201,7 +1182,7 @@
 
   window.openStreamPicker = openStreamPicker;
   window.closeStreamPicker = function () { closeModal(false); };
-  // Використовується кімнатою в звичайному браузері (без Capacitor): відкрити
+  // Використовується кімнатою у браузері: відкрити
   // потік убудованим плеєром замість спроби запустити VLC.
   window.mcStreamsOpen = function (url, title) {
     if (!url) return;

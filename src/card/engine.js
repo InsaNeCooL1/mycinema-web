@@ -2,34 +2,18 @@
 
 'use strict';
 
-/* DESKTOP_MQ та isDesktopLayout() тепер в src/layout.js — єдина точка істини. */
-
-(function bindCardLayoutSwitch() {
-  const onLayoutChange = () => {
-    document.querySelectorAll('.account-menu').forEach(m => m.remove());
-    if (typeof overlay !== 'undefined' && overlay.classList.contains('open') && cardStack.length) {
-      saveCardScroll();
-      renderCard(true);
-    }
-  };
-  if (typeof DESKTOP_MQ.addEventListener === 'function') {
-    DESKTOP_MQ.addEventListener('change', onLayoutChange);
-  } else if (typeof DESKTOP_MQ.addListener === 'function') {
-    DESKTOP_MQ.addListener(onLayoutChange);
-  }
-})();
-
 function makeMediaCtx(item) {
   return { type: 'media', item, activeTab: item.type === 'tv' ? 'seasons' : 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, overviewSource: 'tmdb' };
 }
 
-function hashFor(ctx) { return ctx.type === 'person' ? `#/person/${ctx.id}` : (ctx.type === 'company' ? `#/company/${ctx.id}` : `#/${ctx.item.type}/${ctx.item.id}`); }
+function hashFor(ctx) { return ctx.type === 'person' ? `#/person/${ctx.id}` : (ctx.type === 'company' ? `#/company/${ctx.id}` : (ctx.type === 'streaming' ? `#/streaming/${ctx.id}` : `#/${ctx.item.type}/${ctx.item.id}`)); }
 function pushCardState() {
   const ctx = cardStack[cardStack.length - 1];
   if (!ctx) return;
   const st = { mc: cardStack.length };
   if (ctx.type === 'person') st.ctx = { type: 'person', id: ctx.id };
   else if (ctx.type === 'company') st.ctx = { type: 'company', id: ctx.id };
+  else if (ctx.type === 'streaming') st.ctx = { type: 'streaming', id: ctx.id };
   else st.ctx = { type: 'media', id: ctx.item.id, media_type: ctx.item.type, key: ctx.item.key };
   history.pushState(st, '', hashFor(ctx));
 }
@@ -151,7 +135,7 @@ async function openMediaFromStack(item) {
 
 function cardBar() {
   const bar = el('div', 'card-bar');
-  const back = el('button', 'card-x', '←'); back.title = 'Назад';
+  const back = el('button', 'card-x', '← Назад'); back.title = 'Назад';
   back.addEventListener('click', () => history.back());
   bar.append(back, el('div', 'card-spacer'));
   return bar;
@@ -159,7 +143,7 @@ function cardBar() {
 
 function renderLoading() {
   const top = cardStack[cardStack.length - 1];
-  card.classList.toggle('is-person', top?.type === 'person' || top?.type === 'company');
+  card.classList.toggle('is-person', top?.type === 'person' || top?.type === 'company' || top?.type === 'streaming');
   card.innerHTML = '';
   card.append(cardBar());
   const scroll = el('div', 'card-scroll');
@@ -375,12 +359,13 @@ window.addEventListener('popstate', async (e) => {
 });
 
 function routeFromHash() {
-  const m = location.hash.match(/^#\/(movie|tv|person|company)\/(\d+)$/);
+  const m = location.hash.match(/^#\/(movie|tv|person|company|streaming)\/([A-Za-z0-9_-]+)$/);
   if (!m) return;
   history.replaceState({ mc: 0 }, '', location.pathname + location.search);
-  const id = parseInt(m[2]);
+  const id = /^\d+$/.test(m[2]) ? parseInt(m[2]) : m[2];
   if (m[1] === 'person') openPerson(id);
   else if (m[1] === 'company') openCompany(id);
+  else if (m[1] === 'streaming' && typeof openStreamingProfile === 'function') openStreamingProfile(id);
   else openCard({ key: m[1] + '-' + id, id, type: m[1], title: '', year: '', poster: null, backdrop: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 });
 }
 
@@ -390,17 +375,18 @@ function renderCard(restore) {
 
   const oldIframe = card.querySelector('.card-hero-video');
   if (oldIframe) oldIframe.src = 'about:blank';
+  card.querySelectorAll('.rail-section').forEach(sec => { if (sec._railIO) sec._railIO.disconnect(); });
 
   const prevScroll = card.querySelector('.card-scroll');
   const savedScroll = restore ? (ctx.scroll || 0) : (prevScroll ? prevScroll.scrollTop : 0);
   card.classList.toggle('is-person', ctx.type === 'person' || ctx.type === 'company');
   card.innerHTML = '';
-  if (settings.posterBg && ctx.type === 'media') {
-    const bgPath = ctx.item?.poster || ctx.details?.poster_path;
-    if (bgPath) {
-      const pbg = el('div', 'card-poster-bg');
-      pbg.style.backgroundImage = `url("${TMDB_IMG}w780${bgPath}")`;
-      card.append(pbg);
+  if (ctx.type === 'media') {
+    const glowPath = ctx.item?.backdrop || ctx.details?.backdrop_path || ctx.item?.poster || ctx.details?.poster_path;
+    if (glowPath) {
+      const glow = el('div', 'card-ambient-glow');
+      glow.style.backgroundImage = `url("${TMDB_IMG}w780${glowPath}")`;
+      card.append(glow);
     }
   }
   card.append(cardBar());
@@ -410,12 +396,10 @@ function renderCard(restore) {
   else if (ctx.error) scroll.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${escapeHtml(ctx.error)}</div>`; /* FIX-CARD-ERR-ESC */
   else if (ctx.type === 'person') renderPersonCard(ctx, scroll);
   else if (ctx.type === 'company') renderCompanyCard(ctx, scroll);
+  else if (ctx.type === 'streaming' && typeof renderStreamingCard === 'function') renderStreamingCard(ctx, scroll);
   else {
-    const _isDesktop = isDesktopLayout();
-    if (_isDesktop && typeof renderDesktopCard === 'function') {
+    if (typeof renderDesktopCard === 'function') {
       renderDesktopCard(ctx, scroll);
-    } else if (!_isDesktop && typeof renderMobileCard === 'function') {
-      renderMobileCard(ctx, scroll);
     } else {
       scroll.innerHTML = '<div style="text-align:center; padding:40px; color:var(--danger);">UI картки не завантажено</div>';
     }
@@ -429,7 +413,7 @@ function renderCard(restore) {
 /* FIX-CARD-EMPTY-BASE
    ─────────────────────────────────────────────────────────────
    ЧИСТИЙ АРКУШ.
-   Тут буде новий UI картки (Mobile/Desktop).
+   Тут буде новий UI картки.
    Поки що — порожня заглушка, щоб перевірити, що навігація та
    завантаження даних працюють.
    ───────────────────────────────────────────────────────────── */

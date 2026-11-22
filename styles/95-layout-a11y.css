@@ -1,7 +1,7 @@
 /* ========================================================= */
 /* FIX-DESKTOP-LAYOUT-RESTORE — Повернення верхнього меню ПК */
 /* ========================================================= */
-@media (min-width: 900px) and (min-height: 600px) {
+
   /* 1. Sidebar -> Top Bar */
   #sidebar {
     width: 100vw;
@@ -22,16 +22,13 @@
   .sidebar-header { margin-right: 20px; padding: 0; border: none; height: 100%; display: flex; align-items: center; }
   .sidebar-logo { margin: 0; font-size: 24px; cursor: pointer; }
   /* [LAYOUT] Головна тепер відкривається кліком по логотипу — пункт меню ховаємо лише на десктопі. */
-  html[data-layout="desktop"] #sidebar .nav-item[data-tab="home"] { display: none; }
+  #sidebar .nav-item[data-tab="home"] { display: none; }
   /* [LAYOUT] Обсерваторію заміняє блок «Твій смак» на верхній панелі. */
-  html[data-layout="desktop"] #sidebar .nav-item[data-tab="statistics"] { display: none; }
+  #sidebar .nav-item[data-tab="statistics"] { display: none; }
   .sidebar-email { display: none; }
 
-  /* [LAYOUT] Відступи всієї інфи на головній: 22px зліва та справа. */
-  html[data-layout="desktop"] { --mc-home-pad: 0 22px; }
-
   /* [LAYOUT] «Твій смак» на верхній панелі: розмір як у функціональних кнопок. */
-  html[data-layout="desktop"] .taste-top-btn {
+  .taste-top-btn {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -47,18 +44,18 @@
     cursor: pointer;
     transition: .2s;
   }
-  html[data-layout="desktop"] .taste-top-btn:hover {
+  .taste-top-btn:hover {
     background: rgba(var(--accent-rgb), .22);
     border-color: var(--accent);
   }
-  html[data-layout="desktop"] .taste-top-avatar {
+  .taste-top-avatar {
     display: inline-flex;
     width: 26px;
     height: 26px;
     flex-shrink: 0;
   }
-  html[data-layout="desktop"] .taste-top-avatar svg { width: 26px; height: 26px; }
-  html[data-layout="desktop"] .taste-top-value {
+  .taste-top-avatar svg { width: 26px; height: 26px; }
+  .taste-top-value {
     font-family: var(--mono);
     font-size: 12px;
     font-weight: 800;
@@ -66,7 +63,7 @@
   }
 
   /* [LAYOUT] Рядок пошуку ховається; іконка на верхній панелі його відкриває. */
-  html[data-layout="desktop"] .desktop-search-toggle {
+  .desktop-search-toggle {
     display: flex; align-items: center; justify-content: center;
     width: 38px; height: 38px; padding: 0;
     border-radius: 50%;
@@ -75,13 +72,13 @@
     color: var(--text-secondary);
     cursor: pointer;
   }
-  html[data-layout="desktop"] .desktop-search-toggle:hover {
+  .desktop-search-toggle:hover {
     border-color: var(--accent);
     color: var(--accent);
     background: rgba(var(--accent-rgb), .12);
   }
-  html[data-layout="desktop"] body:not(.mc-search-open) > header { display: none; }
-  html[data-layout="desktop"] body:not(.mc-search-open):not(.no-search) { padding-top: 64px; }
+  body:not(.mc-search-open) > header { display: none; }
+  body:not(.mc-search-open):not(.no-search) { padding-top: 64px; }
   
   /* [LAYOUT] Центруємо меню відносно екрану, а не проміжку логотип→кнопки. */
   .sidebar-nav {
@@ -164,7 +161,7 @@
     background-clip: text;
     -webkit-text-fill-color: transparent;
   }
-  html[data-layout="desktop"] input#q::placeholder { color: transparent; }
+  input#q::placeholder { color: transparent; }
 
   .search-container {
     width: 100%;
@@ -181,9 +178,9 @@
   }
   input#q { background: transparent; border: none; box-shadow: none; height: 100%; width: 100%; font-size: 15px; padding: 0; }
   /* [LAYOUT] Ободок належить підкладці, а не інпуту — межі збігаються з рядком 22px. */
-  html[data-layout="desktop"] input#q:focus { box-shadow: none; }
-  html[data-layout="desktop"] input#q:focus-visible { outline: none; }
-  html[data-layout="desktop"] .search-container:focus-within {
+  input#q:focus { box-shadow: none; }
+  input#q:focus-visible { outline: none; }
+  .search-container:focus-within {
     border-radius: var(--r-sm);
     border-color: var(--accent);
     box-shadow: 0 0 0 2px rgba(var(--accent-rgb), .18);
@@ -217,7 +214,7 @@
   }
 
   /* [LAYOUT] Блок «Для тебе» — окрема виділена панель із горизонтальною стрічкою. */
-  html[data-layout="desktop"] .home-recs-panel {
+  .home-recs-panel {
     background: linear-gradient(135deg, rgba(var(--accent-rgb), .05), rgba(22, 20, 27, .55));
     border: 1px solid rgba(var(--white-rgb), .07);
     border-radius: var(--r-lg);
@@ -225,7 +222,7 @@
     margin-bottom: 26px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, .25);
   }
-  html[data-layout="desktop"] #results .home-recs-panel .home-grid.recs-strip {
+  #results .home-recs-panel .home-grid.recs-strip {
     display: flex;
     flex-wrap: nowrap;
     gap: 12px;
@@ -236,14 +233,14 @@
     scrollbar-width: thin;
     scrollbar-color: var(--accent) rgba(var(--white-rgb), .05);
   }
-  html[data-layout="desktop"] #results .home-recs-panel .recs-strip .rec-card {
+  #results .home-recs-panel .recs-strip .rec-card {
     flex: 0 0 clamp(100px, 8.5vw, 180px);
     width: clamp(100px, 8.5vw, 180px);
   }
 
   /* [LAYOUT] Стрілки прокрутки стрічки — крок 3 картки, великий хіт-бокс. */
-  html[data-layout="desktop"] .home-recs-panel .recs-strip-wrap { position: relative; }
-  html[data-layout="desktop"] .home-recs-panel .recs-strip-arrow {
+  .home-recs-panel .recs-strip-wrap { position: relative; }
+  .home-recs-panel .recs-strip-arrow {
     position: absolute;
     top: 40%;
     transform: translateY(-50%);
@@ -261,29 +258,29 @@
     box-shadow: 0 6px 20px rgba(0, 0, 0, .55);
     transition: .2s;
   }
-  html[data-layout="desktop"] .home-recs-panel .recs-strip-arrow:hover {
+  .home-recs-panel .recs-strip-arrow:hover {
     background: var(--accent);
     color: var(--accent-fg);
     border-color: var(--accent);
   }
-  html[data-layout="desktop"] .home-recs-panel .recs-strip-prev { left: -16px; }
-  html[data-layout="desktop"] .home-recs-panel .recs-strip-next { right: -16px; }
+  .home-recs-panel .recs-strip-prev { left: -16px; }
+  .home-recs-panel .recs-strip-next { right: -16px; }
 
   /* [LAYOUT] Шапка панелі: перемикач одразу біля заголовка, оновлення — праворуч. */
-  html[data-layout="desktop"] .home-recs-panel .section-head {
+  .home-recs-panel .section-head {
     justify-content: flex-start;
     align-items: center;
     gap: 12px;
   }
-  html[data-layout="desktop"] .home-recs-panel .home-inline-type-switch {
+  .home-recs-panel .home-inline-type-switch {
     gap: 5px;
     padding: 4px;
   }
-  html[data-layout="desktop"] .home-recs-panel .home-inline-pill {
+  .home-recs-panel .home-inline-pill {
     padding: 7px 14px;
     font-size: 14.4px;
   }
-  html[data-layout="desktop"] .home-recs-panel .home-refresh-btn {
+  .home-recs-panel .home-refresh-btn {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -300,7 +297,7 @@
     cursor: pointer;
     transition: .2s;
   }
-  html[data-layout="desktop"] .home-recs-panel .home-refresh-btn:hover {
+  .home-recs-panel .home-refresh-btn:hover {
     color: var(--accent);
     border-color: var(--accent);
     background: rgba(var(--accent-rgb), .12);
@@ -312,7 +309,7 @@
     height: calc(100vh - 64px);
     z-index: 1100;
   }
-}
+
 
 /* FIX-FOCUS-RING & NO-TOUCH-HIGHLIGHT */
 *, *::before, *::after {

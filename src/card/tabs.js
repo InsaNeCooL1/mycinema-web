@@ -91,17 +91,33 @@ function renderNotesTab(ctx) {
 function renderCastTab(ctx) {
   const cast = ctx.details.credits?.cast || [];
   if (!cast.length) return [el('div', 'avail-empty', 'Немає даних')];
+  const ordered = cast.slice().sort((a, b) => (b.profile_path ? 1 : 0) - (a.profile_path ? 1 : 0) - ((b.order || 0) - (a.order || 0)) / 100);
+  const stripWrap = el('div', 'rail-strip-wrap actor-strip-wrap');
   const grid = el('div', 'actor-grid');
-  for (const a of cast.slice(0, 20)) {
+  for (const a of ordered.slice(0, 10)) {
     const tile = el('div', 'actor-tile');
     const photo = el(a.profile_path ? 'img' : 'div', 'actor-tile-photo');
     if (a.profile_path) { photo.src = TMDB_IMG + 'w185' + a.profile_path; photo.loading = 'lazy'; }
+    else {
+      photo.classList.add('actor-initials');
+      photo.textContent = String(a.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase();
+    }
     tile.append(photo, el('div', 'actor-tile-name', a.name));
     if (a.character) tile.append(el('div', 'actor-tile-role', a.character));
     tile.addEventListener('click', () => openPerson(a.id));
     grid.append(tile);
   }
-  return [grid];
+  const prev = el('button', 'recs-strip-arrow recs-strip-prev');
+  const next = el('button', 'recs-strip-arrow recs-strip-next');
+  prev.type = 'button'; next.type = 'button';
+  prev.title = 'Назад'; next.title = 'Далі';
+  prev.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+  next.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+  const step = () => grid.clientWidth * 0.8 || 360;
+  prev.onclick = () => grid.scrollBy({ left: -step(), behavior: 'smooth' });
+  next.onclick = () => grid.scrollBy({ left: step(), behavior: 'smooth' });
+  stripWrap.append(prev, grid, next);
+  return [stripWrap];
 }
 
 function renderSimilarTab(ctx) {
@@ -324,7 +340,7 @@ function renderSeasonsTab(ctx) {
   };
 
   const seasonRatings = (s.seasonRatings || {})[selNum] || {};
-  const scoreWrap = el('div', 'mobile-score');
+  const scoreWrap = el('div', 'mobile-score season-score');
   scoreWrap.style.marginBottom = '20px';
   
   const header = el('div', 'score-header');
@@ -431,7 +447,6 @@ function renderSeasonsTab(ctx) {
   let avgCls = 'score-total-val' + (avg > 0 ? ' ' + tempCls(avg * 10) : '');
   totalRow.append(el('span', avgCls, avg > 0 ? fmtNum(avg) : '—'));
   scoreWrap.append(totalRow);
-  wrap.append(scoreWrap);
 
   if (!sel.episodesLoaded) {
     wrap.append(el('div', 'avail-empty', 'Завантаження серій...'));
@@ -547,14 +562,12 @@ function renderStudiosTab(ctx) {
 
 function buildCardTabs(ctx) {
   const r = ctx.item;
-  const isDesktop = isDesktopLayout();
   let tabsList;
   if (r.type === 'tv') {
     tabsList = [{ id: 'seasons', label: 'Сезони' }, { id: 'cast', label: 'Актори' }];
   } else {
     tabsList = [{ id: 'cast', label: 'Актори' }];
   }
-  if (!isDesktop) tabsList.push({ id: 'details', label: 'Деталі' });
   tabsList.push({ id: 'studios', label: 'Студії' });
   if (ctx.similar && ctx.similar.length > 0) tabsList.push({ id: 'similar', label: 'Схоже' });
   tabsList.push({ id: 'notes', label: 'Нотатки' });

@@ -5,14 +5,16 @@ beforeAll(() => {
 });
 
 describe('Ukrainian title logos', () => {
-  it('picks only Ukrainian logos', () => {
+  it('picks Ukrainian first, then English, skips bad aspect ratios', () => {
     const { pickUkrainianLogo } = window._titleLogos;
     const list = [
       { iso_639_1: 'en', file_path: '/en.png' },
       { iso_639_1: 'uk', file_path: '/uk.png' }
     ];
     expect(pickUkrainianLogo(list)).toBe('/uk.png');
-    expect(pickUkrainianLogo([{ iso_639_1: 'en', file_path: '/en.png' }])).toBeNull();
+    expect(pickUkrainianLogo([{ iso_639_1: 'en', file_path: '/en.png' }])).toBe('/en.png');
+    expect(pickUkrainianLogo([{ iso_639_1: 'uk', file_path: '/wide.png', aspect_ratio: 1.1 },
+      { iso_639_1: 'en', file_path: '/good.png', aspect_ratio: 2.4 }])).toBe('/good.png');
     expect(pickUkrainianLogo(null)).toBeNull();
   });
 

@@ -237,10 +237,7 @@
   border: 1px solid rgba(var(--accent-rgb), .24);
 }
 /* Показуємо режими лише там, де їх не ховає 10-card.css
-   (@media max-width:899px або max-height:599px). */
-@media (min-width: 900px) and (min-height: 600px) {
-  .recs-controls-bar .recs-mode-pills { display: flex; }
-}
+   (
 .recs-controls-bar .mood-pills {
   flex: 1 1 320px;
   min-width: 0;
@@ -254,7 +251,7 @@
 .recs-controls-bar .mood-pill {
   height: 34px;
 }
-@media (min-width: 900px) and (min-height: 600px) {
+
   /* Каскад: цей файл іде після 60-perf-home.css, тому перемагає за порядком. */
   body #results .recs-controls-bar .mood-pills {
     padding: 5px;
@@ -264,7 +261,7 @@
   body #results .recs-controls-bar .mood-pill {
     height: 32px;
   }
-}
+
 
 /* FIX-DESKTOP-MOODS — настрої поруч із перемикачем «Фільми / Серіали». */
 .home-head-controls {
@@ -309,11 +306,7 @@
 #results.tab-entering {
   animation: mcTabFade .16s ease-out;
 }
-@media (hover: none) {
-  .item:hover, .taste-summary:hover, .game-card:hover, .actor-tile:hover, .similar-card:hover {
-    transform: none;
-  }
-}
+
 
 
 /* FIX-OBS-SHARE-CSS */
@@ -342,7 +335,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  padding: 16px 16px 16px;
 }
 .share-modal-box {
   background: var(--bg-1);
@@ -411,7 +404,5 @@
 /* Мобільна головна: ховаємо лише режими, а не весь бар —
    інакше разом з ними зникають пілюлі настрою. */
 /* [LAYOUT] Мобільний стиль: scopes через атрибут, щоб не впливати на десктоп. */
-@media (max-width: 899px) {
-  html[data-layout="mobile"] #results .recs-controls-bar .recs-mode-pills { display: none; }
-}
+
 

@@ -152,6 +152,10 @@ function makeCompanyCtx(companyId) {
 
 async function openCompany(companyId) {
   if (!companyId) return;
+  if (typeof window !== 'undefined' && window.STREAM_COMPANY_MAP &&
+      window.STREAM_COMPANY_MAP[companyId] && typeof openStreamingProfile === 'function') {
+    return openStreamingProfile(window.STREAM_COMPANY_MAP[companyId]);
+  }
   overlay.classList.add('open');
   const top = cardStack[cardStack.length - 1];
   if (top && top.type === 'company' && top.id === companyId) return;

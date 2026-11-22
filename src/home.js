@@ -172,7 +172,8 @@ function packCompactMeta(d, type) {
     }));
   }
 
-  const kws = (d.keywords?.keywords || d.keywords?.results || []).slice(0, 14).map(k => k.id);
+  const kwList = (d.keywords?.keywords || d.keywords?.results || []).slice(0, 14);
+  const kws = kwList.map(k => k.id);
   const genres = (d.genres || []).map(g => g.id);
 
   return {
@@ -182,6 +183,7 @@ function packCompactMeta(d, type) {
     dirs: dirs.slice(0, 3),
     cast,
     kws,
+    kwNames: kwList.map(k => ({ id: k.id, name: k.name })),
     genres,
     /* FIX-RELEASE-PACK-META */
     digitalDate: (typeof extractDigitalDate === 'function') ? extractDigitalDate(d) : null,
@@ -292,7 +294,7 @@ function getDominantCriterion(taste) {
 
 async function buildSmartRecommendations(seeds, mood, mode) {
   mode = mode || 'balance';
-  if (!seeds.length) return { items: [], seeds: 0, mood, mode };
+  if (!seeds.length) return { items: [], seeds: 0, seedList: [], topGenres: [], topCast: [], topDirectors: [], topKeywords: [], names: {}, collections: [], seedRecs: [], mood, mode };
 
   const taste = computeTasteVector();
   const domCrit = getDominantCriterion(taste);
@@ -328,7 +330,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
 
   const dirRes = {};
   const actorRes = {};
-  const names = { directors: {}, cast: {} };
+  const names = { directors: {}, cast: {}, keywords: {} };
 
   for (const { seed, meta } of seedDetails) {
     let w = (seed.strength / 10) * seed.resFactor * seed.decayMult;
@@ -339,6 +341,8 @@ async function buildSmartRecommendations(seeds, mood, mode) {
 
     const gKey = meta.colId ? 'col-' + meta.colId : 'seed-' + seed.key;
     const grp = getGroup(gKey);
+
+    (meta.kwNames || []).forEach(k => { if (k.name) names.keywords[k.id] = k.name; });
 
     (meta.dirs || []).forEach(c => {
       names.directors[c.id] = c.name;
@@ -467,6 +471,8 @@ async function buildSmartRecommendations(seeds, mood, mode) {
   const addReason = (entry, tag, text, priority) => {
     if (!entry || entry._seenTags.has(tag)) return;
     entry._seenTags.add(tag);
+    if (!entry._reasonTags) entry._reasonTags = [];
+    entry._reasonTags.push(tag);
     entry._reasons.push({ priority, text });
   };
 
@@ -576,7 +582,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
           ? Math.min(REC_MOOD_SOURCE_CAP, 0.4 * _mw)
           : Math.min(1.2, 0.4 * _mw);
         entry._moodMatch = _mw;
-        addReason(entry, 'mood', `${moodData.emoji} ${moodData.label}`, 8);
+        addReason(entry, 'mood-' + mood, `${moodData.emoji} ${moodData.label}`, 8);
       } else if (batch.source === 'director') {
         entry._sourceRaw += 0.9;
         const dName = names.directors[batch.dirId];
@@ -733,7 +739,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
       if (g) addReason(entry, 'genre-' + g.id, `Твій жанр · ${g.name}`, 3);
     }
     if (domCrit && entry._reasons.length < 2 && ((entry._profileRaw || entry._genreMatch) >= 0.6)) {
-      addReason(entry, 'dom-crit', `Під «${domCrit.label}»`, 2);
+      addReason(entry, 'crit-' + domCrit.key, `Під «${domCrit.label}»`, 2);
     }
     entry._reasons = entry._reasons
       .sort((a, b) => b.priority - a.priority)
@@ -804,11 +810,17 @@ async function buildSmartRecommendations(seeds, mood, mode) {
           addReason(entry, 'dir-' + bestDir.id, `Режисер: ${bestDir.name}`, 9);
         }
 
+        let bestKw = null, bestKwScore = 0;
         (entry._meta.kws || []).forEach(kid => {
-          if (signals.keywords[kid]) kwMatch += signals.keywords[kid] * 0.12;
+          const sc = signals.keywords[kid] || 0;
+          if (sc > bestKwScore) { bestKwScore = sc; bestKw = kid; }
+          if (sc) kwMatch += sc * 0.12;
           if (anti.keywords[kid]) antiKw += anti.keywords[kid] * 0.12;
         });
         kwMatch = Math.min(0.6, kwMatch);
+        if (bestKw && bestKwScore > 0) {
+          addReason(entry, 'kw-' + bestKw, `Тема: ${names.keywords[bestKw] || 'ваша тема'}`, 4);
+        }
 
         entry._profileRaw = entry._genreMatch + actorMatch + directorMatch + kwMatch;
         entry._antiPenalty = entry._antiGenre + Math.min(0.4, antiDir) + Math.min(0.35, antiKw) + Math.min(0.35, antiCast);
@@ -822,6 +834,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
         entry._sortScore = recRankScore(entry, (rnd() - 0.5) * 0.08);
         /* FIX-RELEASE-COPY-META — copy before delete for poster badges */
         entry.digitalReleaseDate = (entry._meta && entry._meta.digitalDate) || null;
+        entry.colId = (entry._meta && entry._meta.colId) || null;
         entry.streamingUA = (entry._meta && entry._meta.providersUA) || [];
         delete entry._seenTags;
         delete entry._meta;
@@ -875,9 +888,30 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     return [...enriched, ...rest].sort((a, b) => b._sortScore - a._sortScore).slice(0, 80);
   };
 
+  const collections = [];
+  const colSeen = new Set();
+  seedDetails.forEach(({ seed, meta }) => {
+    if (meta && meta.colId && !colSeen.has(meta.colId)) {
+      colSeen.add(meta.colId);
+      collections.push({ id: meta.colId, title: seed.title });
+    }
+  });
+
   return {
     items: [...finalizeType(byType.movie), ...finalizeType(byType.tv)],
     seeds: seeds.length,
+    seedList: seeds.map(s => ({ key: s.key, id: s.id, type: s.type, title: s.title, avg: s.avg, isFav: s.isFav, year: s.year })),
+    topGenres,
+    topCast,
+    topDirectors,
+    topKeywords: topKw,
+    names,
+    collections,
+    seedRecs: seedDetails.map(({ seed, recs }) => ({
+      key: seed.key,
+      items: (recs || []).filter(r => r && r.poster_path).slice(0, 12)
+        .map(r => normalizeItem({ ...r, media_type: seed.type }))
+    })),
     mood,
     mode
   };
@@ -1316,14 +1350,30 @@ function updateTopTasteButton(taste) {
   const avatarData = computeTempAvatarData();
   const avatarEl = document.getElementById('taste-top-avatar');
   if (avatarEl) avatarEl.innerHTML = buildTempAvatarSVG(avatarData, 26);
-  let summaryVal = '—';
+
+  const moodRgb = {
+    fun: '255,196,92', intense: '255,123,92', dark: '197,163,255',
+    epic: '120,190,255', chill: '163,230,179', thoughtful: '180,160,255'
+  }[avatarData.mood] || '163,230,179';
+  btn.style.setProperty('--mood-rgb', moodRgb);
+
+  const labelEl = document.getElementById('taste-top-label');
+  if (labelEl) labelEl.textContent = String(avatarData.moodLabel || 'На орбіті').toUpperCase();
+
+  const valEl = document.getElementById('taste-top-value');
   const t = taste || computeTasteVector();
+  let summaryVal = '—';
   if (t && t.count >= 3) {
     const vals = RATING_CRITERIA.map(c => t[c.key] || 0).filter(v => v > 0);
-    if (vals.length) summaryVal = fmtNum(vals.reduce((a, b) => a + b, 0) / vals.length) + '/10';
+    if (vals.length) summaryVal = (Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10).toFixed(1);
   }
-  const valEl = document.getElementById('taste-top-value');
   if (valEl) valEl.textContent = summaryVal;
+
+  const deltaEl = document.getElementById('taste-top-delta');
+  if (deltaEl) {
+    const d = Number(avatarData.delta || 0);
+    deltaEl.textContent = (d >= 0 ? '▲ +' : '▼ ') + (Math.round(d * 10) / 10).toFixed(1);
+  }
 }
 
 function renderTasteSummary(taste) {
@@ -1412,13 +1462,11 @@ function computeRecsSignature(seeds) {
   const castSig = `${castVals.length}:${castVals.reduce((a, b) => a + b, 0).toFixed(1)}`;
   const day = new Date().toISOString().slice(0, 10);
   const moodW = state.home.mood && MOODS[state.home.mood] ? (MOODS[state.home.mood].weight || 1) : 0; /* FIX-MOOD-AGGR-SIG */
-  return `v15-imdb|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}:${moodW}|mode:${state.home.mode || 'balance'}|dig:${settings.digitalOnly ? 1 : 0}|str:${settings.streamingOnlyUA ? 1 : 0}`; /* FIX-IMDB-SIG */
+  return `v17-rails|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}:${moodW}|mode:${state.home.mode || 'balance'}|dig:${settings.digitalOnly ? 1 : 0}|str:${settings.streamingOnlyUA ? 1 : 0}`; /* FIX-IMDB-SIG */
 }
 
 async function loadHome() {
   if (state.tab !== 'home') return;
-  // FIX-MOBILE-MODES: старий matchMedia щоразу скидав gems/fresh на balance
-  // на вузьких екранах (APK/телефон), хоча кнопки режимів показуються скрізь.
   if (!state.home.mode) state.home.mode = 'balance';
 
   const taste = computeTasteVector();
@@ -1579,9 +1627,6 @@ function renderHomeSkeleton(taste) {
   box.replaceChildren();
 
   updateTopTasteButton(taste);
-  if (typeof isDesktopLayout === 'function' && !isDesktopLayout()) {
-    box.append(renderTasteSummary(taste || computeTasteVector()));
-  }
 
   const wrap = el('div', 'home-wrap');
   buildFactOfDayCard();
@@ -1609,11 +1654,19 @@ function renderHomeSkeleton(taste) {
   box.append(wrap);
 }
 
-function recCard(item, allowDismiss) {
-  const c = el('div', 'rec-card');
+function recCard(item, allowDismiss, wide) {
+  const c = el('div', 'rec-card' + (wide ? ' rec-card-wide' : ''));
   const wrap = el('div', 'rec-poster-wrap');
-  const p = el('img', 'rec-poster'); p.src = TMDB_IMG + 'w342' + item.poster; p.loading = 'lazy'; p.decoding = 'async';
+  const p = el('img', 'rec-poster');
+  const widePath = wide && item.backdrop;
+  p.src = TMDB_IMG + (widePath ? 'w780' : 'w342') + (widePath || item.poster || '');
+  p.loading = 'lazy'; p.decoding = 'async';
   wrap.append(p);
+  if (wide) {
+    const titleOverlay = el('div', 'wide-poster-title', item.title || '');
+    wrap.append(titleOverlay);
+    if (typeof applyTitleLogo === 'function') applyTitleLogo(item, titleOverlay, 'rec-title-logo', true);
+  }
   if (allowDismiss && typeof dismissRec === 'function') {
     const disBtn = el('button', 'rec-dismiss', '✕');
     disBtn.type = 'button';
@@ -1649,14 +1702,18 @@ function recCard(item, allowDismiss) {
     else if (_rel && _rel <= _today && (!_dig || _dig > _today) && item.type === 'movie') _b = { cls: 'cinema', txt: '🎬 Кіно' };
     if (_b) wrap.append(el('span', 'rec-badge ' + _b.cls, _b.txt));
   } catch (e) {}
+  if (typeof item._sortScore === 'number' && item._sortScore > 0) {
+    wrap.append(el('span', 'rec-match', Math.round(item._sortScore * 100) + '%'));
+  }
   c.append(wrap);
-  c.append(el('div', 'row-title', item.title));
+  if (!wide) c.append(el('div', 'row-title', item.title));
   let meta = item.year || '';
   if (item.tmdbRating) meta += (meta ? ' · ' : '') + item.tmdbRating.toFixed(1);
   c.append(el('div', 'row-meta', meta));
   if (item._reasons && item._reasons.length) {
     c.append(el('div', 'rec-why', item._reasons.join(' · ')));
   }
+  c._mcItem = item;
   c.addEventListener('click', () => openCard(item));
   return c;
 }
@@ -1730,6 +1787,690 @@ function buildHomeTypeSwitch(taste) {
   return sw;
 }
 
+
+/* ================= RAILS UI ================= */
+const HERO_ROTATE_MS = 18000;
+let _heroVisibilityHandler = null;
+
+window.refreshHomeRecs = () => {
+  if (typeof mcCacheDel === 'function') mcCacheDel(RECS_CACHE);
+  state.home.refreshNonce = (state.home.refreshNonce || 0) + 1;
+  state.home.sig = null; state.home.recs = null;
+  state.home.shown = { movie: 14, tv: 14 };
+  state.home.genShown = {};
+  _clearHeroTimer();
+  refresh();
+  showSyncToast('✨ Оновлено');
+};
+
+window.setHomeType = (type) => {
+  if (type !== 'movie' && type !== 'tv') return;
+  state.home.tab = type;
+  try { localStorage.setItem('mycinema.home.tab', type); } catch (e) {}
+  state.home.shown[type] = 14;
+  setTab('home');
+};
+function _clearHeroTimer() {
+  if (window._mcHeroTimer) { clearInterval(window._mcHeroTimer); window._mcHeroTimer = null; }
+  if (_heroVisibilityHandler) {
+    document.removeEventListener('visibilitychange', _heroVisibilityHandler);
+    _heroVisibilityHandler = null;
+  }
+}
+
+function getTvStreamItems(st) {
+  const popPool = (st.pop || []).filter(x => !(typeof isDismissed === 'function' && isDismissed(x.key)));
+  const newPool = (st.fresh || []).filter(x => !(typeof isDismissed === 'function' && isDismissed(x.key)));
+  const pref = {};
+  Object.values(lib).forEach(x => {
+    if (x.type !== 'tv') return;
+    const avg = computeItemRating(x).avg;
+    if (avg < 7 && !x.favorite) return;
+    const w = ((avg || 8) / 10) * Math.max(0.2, tasteDecay(x.updated));
+    (x.genres || []).forEach(gid => { pref[gid] = (pref[gid] || 0) + w; });
+  });
+  const rankedPop = popPool.map((x, idx) => {
+    const saved = lib[x.key];
+    const seenPenalty = saved && (saved.status === 'watched' || saved.status === 'dropped') ? 100 : 0;
+    let gBoost = 0;
+    (x.genres || []).forEach(gid => { gBoost += (pref[gid] || 0); });
+    return { x, sortVal: idx - Math.min(gBoost, 4) * 1.2 + seenPenalty };
+  }).sort((a, b) => a.sortVal - b.sortVal).map(o => o.x);
+  const popPick = rankedPop.slice(0, 36);
+  const used = new Set(popPick.map(x => x.key));
+  const newPick = newPool.filter(x => !used.has(x.key)).slice(0, 20);
+  const mixed = [];
+  let pi = 0, ni = 0;
+  while (mixed.length < 50 && (pi < popPick.length || ni < newPick.length)) {
+    if (pi < popPick.length && mixed.length < 50) mixed.push(popPick[pi++]);
+    if (pi < popPick.length && mixed.length < 50) mixed.push(popPick[pi++]);
+    if (ni < newPick.length && mixed.length < 50) mixed.push(newPick[ni++]);
+  }
+  return mixed;
+}
+
+function renderHomeHero(hero) {
+  _clearHeroTimer();
+  const sec = el('section', 'home-hero');
+  const bgA = el('div', 'home-hero-bg active');
+  const bgB = el('div', 'home-hero-bg');
+  const inner = el('div', 'home-hero-inner');
+  const badge = el('div', 'home-hero-badge', '✨ Для тебе сьогодні');
+  const title = el('h1', 'home-hero-title');
+  const metaLine = el('div', 'home-hero-meta');
+  const why = el('div', 'home-hero-why');
+  const actions = el('div', 'home-hero-actions');
+  const moreBtn = el('button', 'hero-btn primary', 'Детальніше');
+  moreBtn.type = 'button';
+  const listBtn = el('button', 'hero-btn', 'У список');
+  listBtn.type = 'button';
+  const dots = el('div', 'home-hero-dots');
+  const arrowPrev = el('button', 'hero-arrow hero-arrow-prev');
+  arrowPrev.type = 'button';
+  arrowPrev.title = 'Попередній';
+  arrowPrev.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+  const arrowNext = el('button', 'hero-arrow hero-arrow-next');
+  arrowNext.type = 'button';
+  arrowNext.title = 'Наступний';
+  arrowNext.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+  actions.append(moreBtn, listBtn);
+  inner.append(badge, title, metaLine, why, actions, dots);
+  sec.append(bgA, bgB, inner, arrowPrev, arrowNext);
+
+  const slides = [hero.item].concat(hero.slides || []);
+  let idx = 0;
+  let bgTop = bgA;
+  let firstPaint = true;
+  const paint = () => {
+    const it = slides[idx % slides.length] || {};
+    const path = it.backdrop || it.poster;
+    const url = path ? `url("${TMDB_IMG}w1280${path}")` : '';
+    if (firstPaint) {
+      bgTop.style.backgroundImage = url;
+      firstPaint = false;
+    } else {
+      const next = bgTop === bgA ? bgB : bgA;
+      next.style.backgroundImage = url;
+      next.classList.add('active');
+      bgTop.classList.remove('active');
+      bgTop = next;
+      inner.classList.remove('swap');
+      void inner.offsetWidth;
+      inner.classList.add('swap');
+    }
+    title.textContent = it.title || '';
+    let meta = it.year || '';
+    const rr = (typeof imdbRef === 'function') ? imdbRef(it) : null;
+    if (rr && rr.rating > 0) meta += (meta ? ' · ' : '') + 'IMDb ' + rr.rating.toFixed(1);
+    if (it.genres && it.genres.length && typeof GENRES !== 'undefined') {
+      const g = GENRES.find(x => x.id === it.genres[0]);
+      if (g && g.name) meta += (meta ? ' · ' : '') + g.name;
+    }
+    if (typeof it._sortScore === 'number') meta += (meta ? ' · ' : '') + Math.round(it._sortScore * 100) + '% збіг';
+    metaLine.textContent = meta;
+    why.textContent = (it._reasons || []).join(' · ');
+    [...dots.children].forEach((d, i) => d.classList.toggle('active', i === idx % slides.length));
+  };
+  moreBtn.onclick = () => openCard(slides[idx % slides.length]);
+  listBtn.onclick = () => {
+    const it = slides[idx % slides.length];
+    if (!it) return;
+    updateCore(it, { status: 'planned' });
+    showSyncToast('📅 Додано у «Планую»');
+  };
+  slides.forEach((_, i) => {
+    dots.append(el('span', 'hero-dot' + (i ? '' : ' active')));
+  });
+  paint();
+  const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const advance = () => { idx = (idx + 1) % slides.length; paint(); };
+  const start = () => { if (!window._mcHeroTimer && !document.hidden && !reduce) window._mcHeroTimer = setInterval(advance, HERO_ROTATE_MS); };
+  const stop = () => { if (window._mcHeroTimer) { clearInterval(window._mcHeroTimer); window._mcHeroTimer = null; } };
+  const go = (delta) => {
+    idx = (idx + delta + slides.length) % slides.length;
+    paint();
+    stop();
+    start();
+  };
+  arrowPrev.onclick = () => go(-1);
+  arrowNext.onclick = () => go(1);
+  if (slides.length > 1 && !reduce) {
+    _heroVisibilityHandler = () => { if (document.hidden) stop(); else start(); };
+    document.addEventListener('visibilitychange', _heroVisibilityHandler);
+    start();
+  } else {
+    arrowPrev.style.display = 'none';
+    arrowNext.style.display = 'none';
+  }
+  return sec;
+}
+
+function renderRailSection(rail) {
+  const sec = el('section', 'home-section rail-section');
+  const head = el('div', 'section-head rail-head');
+  const h = el('h2', 'section-title', rail.title);
+  head.append(h);
+  if (rail.subtitle) head.append(el('span', 'section-sub', rail.subtitle));
+  const expand = el('button', 'rail-expand', 'Показати все');
+  expand.type = 'button';
+  head.append(expand);
+
+  const stripWrap = el('div', 'rail-strip-wrap');
+  const grid = el('div', 'rail-strip');
+  let filled = false;
+  const fillRail = () => {
+    if (filled) return;
+    filled = true;
+    const frag = document.createDocumentFragment();
+    rail.items.forEach(it => frag.append(recCard(it, true, true)));
+    grid.append(frag);
+  };
+  if (typeof IntersectionObserver !== 'undefined') {
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some(x => x.isIntersecting)) { fillRail(); sec.classList.add('revealed'); io.disconnect(); sec._railIO = null; }
+    }, { rootMargin: '500px 0px' });
+    sec._railIO = io;
+    io.observe(sec);
+  } else {
+    fillRail();
+    sec.classList.add('revealed');
+  }
+  const step = () => {
+    const card = grid.querySelector('.rec-card');
+    return grid.clientWidth * 0.8 || 380;
+  };
+  // Колесо/тачпад над стрічкою гортає її горизонтально,
+  // а на краях знову віддає скрол сторінці.
+  const prev = el('button', 'recs-strip-arrow recs-strip-prev');
+  const next = el('button', 'recs-strip-arrow recs-strip-next');
+  prev.type = 'button'; next.type = 'button';
+  prev.title = 'Назад'; next.title = 'Далі';
+  prev.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+  next.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+  prev.addEventListener('click', () => grid.scrollBy({ left: -step(), behavior: 'smooth' }));
+  next.addEventListener('click', () => grid.scrollBy({ left: step(), behavior: 'smooth' }));
+  stripWrap.append(prev, grid, next);
+  sec.append(head, stripWrap);
+  expand.onclick = () => {
+    fillRail();
+    sec.classList.add('revealed');
+    const on = sec.classList.toggle('expanded');
+    expand.textContent = on ? 'Згорнути' : 'Показати все';
+  };
+  return sec;
+}
+
+
+/* ================= СТРІМІНГ-ХАБИ (Серіали) ================= */
+const STREAM_HUBS = [
+  { id: 'all', label: 'Усі' },
+  { id: 'netflix', label: 'NETFLIX', network: 213, logo: '/rK1KljqmbvO9HQa1PBFLILWah72.png', color: '#e50914', tagline: 'Оригінальні хіти й свіжі прем’єри' },
+  { id: 'apple', label: 'Apple TV+', network: 2552, logo: '/v9SnyvYt0U3KGgBH3Sbh3z4yODe.png', color: '#f5f5f7', tagline: 'Кінематографічні оригінали' },
+  { id: 'hbo', label: 'HBO / Max', network: 49, logo: '/skypuy7SXuugIQeYg0IglmzoKaS.png', color: '#9b6cff', tagline: 'Золота колекція й престижні серіали' },
+  { id: 'prime', label: 'Prime Video', network: 1024, logo: '/gMZdpavHmxFNnLpMHwVxfqeux2g.png', color: '#00a8e0', tagline: 'Оригінали й великі каталоги' },
+  { id: 'disney', label: 'Disney+', network: 2739, logo: '/5eZ872CghnHFLB1j8grszbrx0dx.png', color: '#3b82f6', tagline: 'Саги, сімейні й Marvel' },
+  { id: 'hulu', label: 'Hulu', provider: 15, region: 'US', logo: '/44uAnmSqvA4yBOdbPWN8YgQHjWm.png', color: '#1ce783', tagline: 'Американські прем’єри та ексклюзиви' },
+  { id: 'peacock', label: 'Peacock', provider: 386, region: 'US', logo: '/a1UIdq5BrkcAxnxcUhFsNbXnxeu.png', color: '#f5b300', tagline: 'Хіти NBCUniversal' },
+  { id: 'sky', label: 'Sky', provider: 29, region: 'GB', logo: '/1Yvl9eP3pmktqChitnFhHJHcBtX.png', color: '#e6b0ff', tagline: 'Британські прем’єри й HBO' }
+];
+const _hubCache = new Map();
+
+function _hubDiscover(hub, extra) {
+  const p = new URLSearchParams({
+    language: 'uk-UA',
+    with_type: '2|4',
+    'vote_count.gte': '120',
+    'vote_average.gte': '6.5'
+  });
+  if (hub.network) p.set('with_networks', String(hub.network));
+  if (hub.provider) {
+    p.set('with_watch_providers', String(hub.provider));
+    p.set('watch_region', hub.region || 'US');
+    p.set('with_watch_monetization_types', 'flatrate');
+  }
+  Object.keys(extra || {}).forEach(k => p.set(k, extra[k]));
+  return '/discover/tv?' + p.toString();
+}
+
+const HUB_POOL_SIZE = 60;
+const HUB_WINDOW = 30;
+const HUB_ROTATE_MS = 2 * 24 * 60 * 60 * 1000;
+
+async function fetchHubRails(hubId) {
+  const epoch = Math.floor(Date.now() / HUB_ROTATE_MS);
+  const cacheKey = hubId + '|' + epoch;
+  if (_hubCache.has(cacheKey)) return _hubCache.get(cacheKey);
+  try {
+    const persisted = typeof mcCacheGet === 'function' ? mcCacheGet('mycinema.hub.' + cacheKey, null) : null;
+    if (persisted && persisted.rails && Date.now() - (persisted.ts || 0) < HUB_ROTATE_MS) {
+      _hubCache.set(cacheKey, persisted.rails);
+      return persisted.rails;
+    }
+  } catch (e) {}
+  const hub = STREAM_HUBS.find(x => x.id === hubId) || STREAM_HUBS[0];
+  const year = new Date().getFullYear() - 2;
+  const specs = hub.id === 'all'
+    ? [
+        { id: 'hub-trending', title: 'У тренді цього тижня', subtitle: 'Зараз дивляться', path: '/trending/tv/week?language=uk-UA' },
+        { id: 'hub-mini', title: 'Міні-серіали на вихідні', subtitle: 'Завершені історії', path: _hubDiscover(hub, { with_type: '2', sort_by: 'vote_average.desc', 'vote_count.gte': '300' }) },
+        { id: 'hub-cult', title: 'Завершені культові серіали', subtitle: 'Без кліфхенгерів', path: _hubDiscover(hub, { with_status: '3', sort_by: 'vote_average.desc', 'vote_count.gte': '60', 'vote_average.gte': '6.0' }) }
+      ]
+    : [
+        { id: 'hub-' + hub.id + '-best', title: `Найкраще для вас на ${hub.label}`, subtitle: 'За вашим смаком', path: _hubDiscover(hub, { sort_by: 'vote_average.desc' }) },
+        { id: 'hub-' + hub.id + '-new', title: `Нове й популярне на ${hub.label}`, subtitle: 'Останні роки', path: _hubDiscover(hub, { sort_by: 'popularity.desc', 'first_air_date.gte': year + '-01-01', 'vote_count.gte': '30', 'vote_average.gte': '6.0' }) },
+        { id: 'hub-' + hub.id + '-mini', title: `Міні-серіали ${hub.label}`, subtitle: '6–8 серій', path: _hubDiscover(hub, { with_type: '2', sort_by: 'vote_average.desc', 'vote_count.gte': '300' }) },
+        { id: 'hub-' + hub.id + '-done', title: `Завершені серіали ${hub.label}`, subtitle: 'Дивитись повністю', path: _hubDiscover(hub, { with_status: '3', sort_by: 'vote_average.desc', 'vote_count.gte': '60', 'vote_average.gte': '6.0' }) }
+      ];
+  const pagePath = (path, page) => path + (path.indexOf('?') === -1 ? '?' : '&') + 'page=' + page;
+  const out = await Promise.all(specs.map(async spec => {
+    try {
+      const pages = await Promise.all([1, 2, 3, 4, 5].map(p => tmdbFetch(pagePath(spec.path, p)).catch(() => ({ results: [] }))));
+      const pool = pages.flatMap(d => d.results || [])
+        .filter(x => x && x.poster_path && !(typeof isExcludedShow === 'function' && isExcludedShow(x, 'tv')))
+        .map(x => normalizeItem({ ...x, media_type: 'tv' }));
+      const seen = new Set();
+      const unique = pool.filter(x => x.id && !seen.has(x.id) && seen.add(x.id));
+      const source = unique.length ? unique : pool;
+      // Кожні 2 дні вікно зсувається на 15 тайтлів: 15 приходить, 15 іде.
+      // Для малого пулу зменшуємо вікно, бо інакше завжди повертався б той самий набір.
+      if (source.length <= HUB_WINDOW) return { id: spec.id, title: spec.title, subtitle: spec.subtitle, items: source };
+      const maxStart = source.length - HUB_WINDOW;
+      const start = (epoch * (HUB_WINDOW / 2)) % (maxStart + 1);
+      const items = Array.from({ length: HUB_WINDOW }, (_, i) => source[start + i]);
+      return { id: spec.id, title: spec.title, subtitle: spec.subtitle, items };
+    } catch (e) {
+      return { id: spec.id, title: spec.title, subtitle: spec.subtitle, items: [] };
+    }
+  }));
+  _hubCache.set(cacheKey, out);
+  try { if (typeof mcCacheSet === 'function') mcCacheSet('mycinema.hub.' + cacheKey, { ts: Date.now(), rails: out }); } catch (e) {}
+  // тримаємо лише останні 3 доби кешу
+  [..._hubCache.keys()].forEach(k => {
+    const e = Number(String(k).split('|')[1]);
+    if (isFinite(e) && epoch - e > 3) _hubCache.delete(k);
+  });
+  return out;
+}
+
+function renderHubPills(scope) {
+  const active = state.home.hub || 'all';
+  const wrap = el('div', 'hub-pills');
+  STREAM_HUBS.forEach(h => {
+    const b = el('button', 'hub-pill' + (h.id === active ? ' active' : ''), h.label);
+    b.type = 'button';
+    b.onclick = () => {
+      state.home.hub = h.id;
+      try { localStorage.setItem('mycinema.home.hub', h.id); } catch (e) {}
+      _clearHeroTimer();
+      if (scope === 'streamings') renderStreamings(); else refresh();
+    };
+    wrap.append(b);
+  });
+  return wrap;
+}
+
+let _settingsMoved = [];
+
+function restoreSettingsPageBoxes() {
+  _settingsMoved.forEach(item => {
+    if (item.box && item.parent && item.box.parentElement !== item.parent) item.parent.appendChild(item.box);
+  });
+  _settingsMoved = [];
+}
+
+function renderSettingsPage() {
+  if (state.tab !== 'settings') return;
+  restoreSettingsPageBoxes();
+  box.replaceChildren();
+  box.style.padding = '0 12px';
+  box.append(el('h2', 'section-title', 'Налаштування'));
+
+  const grid = el('div', 'settings-page-grid');
+  const groups = (typeof SETTINGS_GROUPS !== 'undefined') ? SETTINGS_GROUPS : {};
+  const ico = (path) => '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + path + '</svg>';
+  const titles = {
+    view: [ico('<circle cx="12" cy="12" r="9"/><circle cx="7.5" cy="10" r="1.2"/><circle cx="12" cy="6.8" r="1.2"/><circle cx="16.5" cy="9" r="1.2"/><path d="M12 21c3.3 0 5-2 5-4.3 0-2-1.7-3.2-3.6-3.2-1.5 0-2.4.9-2.4 2.1 0 1.1.8 1.8.8 2.6 0 .9-.7 1.5-1.7 1.5-1.6 0-2.9-1.6-2.9-4.2 0-3.6 2.9-6.5 6.5-6.5"/>'), 'Вигляд', 'Кольори, постери, логотипи'],
+    online: [ico('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.4 3.8 5.5 3.8 9S14.5 18.6 12 21c-2.5-2.4-3.8-5.5-3.8-9S9.5 5.4 12 3Z"/>'), 'Онлайн', 'Джерела перегляду й фільтри релізів'],
+    extra: [ico('<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>'), 'Додаткові функції', 'Клавіатура, ефекти, інструменти'],
+    data: [ico('<path d="M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3Z"/><path d="M4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'), 'Дані', 'Бібліотека, експорт, синхронізація']
+  };
+
+  if (typeof renderSettingsSwatches === 'function') renderSettingsSwatches();
+  if (typeof injectSnowToggle === 'function') injectSnowToggle();
+  if (typeof injectExtraSettings === 'function') injectExtraSettings();
+  if (typeof injectDismissedReset === 'function') injectDismissedReset();
+  if (typeof refreshSettingsControls === 'function') refreshSettingsControls();
+
+  Object.keys(groups).forEach(key => {
+    if (key === 'data') return;
+    const modal = document.getElementById(groups[key]);
+    const inner = modal && modal.querySelector('.settings-box');
+    const card = el('section', 'settings-page-card');
+    const meta = titles[key] || ['⚙️', key, ''];
+    const icon = el('div', 'settings-page-icon');
+    icon.innerHTML = meta[0];
+    card.append(icon);
+    card.append(el('h3', 'settings-page-title', meta[1]));
+    card.append(el('div', 'settings-page-desc', meta[2]));
+    if (inner) {
+      inner.parentElement.removeChild(inner);
+      inner.classList.add('settings-page-inner');
+      card.append(inner);
+      _settingsMoved.push({ box: inner, parent: modal });
+    }
+    grid.append(card);
+  });
+
+  // Акаунт + оновлення рекомендацій
+  const accCard = el('section', 'settings-page-card');
+  const accIcon = el('div', 'settings-page-icon');
+  accIcon.innerHTML = ico('<circle cx="12" cy="8" r="4"/><path d="M4 21v-1.5A4.5 4.5 0 0 1 8.5 15h7a4.5 4.5 0 0 1 4.5 4.5V21"/>');
+  accCard.append(accIcon);
+  accCard.append(el('h3', 'settings-page-title', 'Акаунт'));
+  accCard.append(el('div', 'settings-page-desc', (window.currentUser && window.currentUser.email) || 'Гість'));
+  const refreshSlot = document.getElementById('refresh-slot');
+  const refreshBtn = refreshSlot && refreshSlot.querySelector('button');
+  if (refreshBtn) {
+    refreshBtn.classList.add('settings-page-action');
+    refreshSlot.removeChild(refreshBtn);
+    accCard.append(refreshBtn);
+    _settingsMoved.push({ box: refreshBtn, parent: refreshSlot });
+  }
+  const logout = el('button', 'settings-page-action', 'Вийти з акаунту');
+  logout.type = 'button';
+  logout.onclick = () => { if (typeof logoutUser === 'function') logoutUser(); };
+  accCard.append(logout);
+
+  // Елементи розділу «Дані» — нижче за акаунт
+  const dataModal = document.getElementById(groups.data);
+  const dataInner = dataModal && dataModal.querySelector('.settings-box');
+  if (dataInner) {
+    dataInner.parentElement.removeChild(dataInner);
+    dataInner.classList.add('settings-page-inner');
+    accCard.append(dataInner);
+    _settingsMoved.push({ box: dataInner, parent: dataModal });
+  }
+  grid.append(accCard);
+
+  box.append(grid);
+}
+
+window.__renderSettingsPage = renderSettingsPage;
+window.renderSettingsPage = renderSettingsPage;
+
+function renderStreamings() {
+  if (state.tab !== 'streamings') return;
+  box.replaceChildren();
+  box.style.padding = '0 12px';
+  box.append(el('h2', 'section-title', 'Стріммінги'));
+  box.append(el('p', 'streamings-lead', 'Профілі платформ. Обери бренд — і ми покажемо його добірки серед серіалів.'));
+
+  const grid = el('div', 'streaming-profiles');
+  STREAM_HUBS.filter(h => h.id !== 'all').forEach(h => {
+    const card = el('button', 'streaming-profile');
+    card.type = 'button';
+    card.style.setProperty('--hub-accent', h.color || '#ffb86c');
+
+    const glow = el('div', 'streaming-profile-glow');
+    const logo = el('img', 'streaming-profile-logo');
+    logo.src = TMDB_IMG + 'w300' + h.logo;
+    logo.alt = h.label;
+    logo.loading = 'lazy';
+    const name = el('div', 'streaming-profile-name', h.label);
+    const desc = el('div', 'streaming-profile-desc', h.tagline || '');
+    const meta = el('div', 'streaming-profile-meta',
+      h.network ? ('Originals · network ' + h.network) : ('Provider ' + h.provider + ' · ' + (h.region || 'US')));
+    const open = el('div', 'streaming-profile-open', 'Відкрити добірки →');
+
+    card.append(glow, logo, name, desc, meta, open);
+    card.onclick = () => {
+      state.home.hub = h.id;
+      try { localStorage.setItem('mycinema.home.hub', h.id); } catch (e) {}
+      if (typeof openStreamingProfile === 'function') openStreamingProfile(h.id);
+      else {
+        state.home.tab = 'tv';
+        setTab('home');
+      }
+    };
+    grid.append(card);
+  });
+  box.append(grid);
+}
+
+function renderHomeRails(recs, wrap) {
+  const type = state.home.tab;
+  const items = (recs.items || []).filter(x =>
+    x.type === type &&
+    !(typeof isTrackedInLib === 'function' ? isTrackedInLib(x.key) : !!lib[x.key]) &&
+    !(typeof isDismissed === 'function' && isDismissed(x.key)));
+  const g = state.home.general || {};
+  const genreNames = {};
+  (typeof GENRES !== 'undefined' ? GENRES : []).forEach(x => { genreNames[x.id] = x.name; });
+  const criteria = (typeof RATING_CRITERIA !== 'undefined' ? RATING_CRITERIA : [])
+    .map(x => ({ key: x.key, label: x.label }));
+  const seedYears = (recs.seedList || [])
+    .map(x => parseInt(x.year, 10))
+    .filter(y => y > 1985);
+  const tvStreams = (g.tvStreams || []).map(st => ({
+    id: st.id, title: st.title, logo: st.logo, items: getTvStreamItems(st)
+  }));
+  const opts = {
+    items,
+    general: g,
+    tvStreams,
+    seeds: recs.seedList || [],
+    topGenres: recs.topGenres || [],
+    topCast: recs.topCast || [],
+    topDirectors: recs.topDirectors || [],
+    topKeywords: recs.topKeywords || [],
+    names: recs.names || {},
+    genreNames,
+    collections: recs.collections || [],
+    seedRecs: (recs.seedRecs || []).map(sr => ({
+      key: sr.key,
+      items: (sr.items || []).filter(x =>
+        x.type === type &&
+        !(typeof isTrackedInLib === 'function' ? isTrackedInLib(x.key) : !!lib[x.key]) &&
+        !(typeof isDismissed === 'function' && isDismissed(x.key)))
+    })),
+    criteria,
+    moods: (typeof MOODS !== 'undefined' ? MOODS : {}),
+    seedYears,
+    decades: [1980, 1990, 2000, 2010, 2020],
+    type,
+    mode: recs.mode || state.home.mode || 'balance',
+    userId: (window.currentUser && window.currentUser.uid) || 'guest',
+    dateKey: new Date().toISOString().slice(0, 10),
+    nonce: state.home.refreshNonce || 0,
+    nowYear: new Date().getFullYear(),
+    limit: 18,
+    ratingOf: (x) => (typeof imdbRef === 'function' ? imdbRef(x) : null)
+  };
+  const result = (typeof buildRails === 'function') ? buildRails(opts) : { hero: null, rails: [] };
+  state.home.rails = result;
+  if (result.hero) wrap.append(renderHomeHero(result.hero));
+
+  if (type === 'tv') {
+    try { state.home.hub = localStorage.getItem('mycinema.home.hub') || state.home.hub || 'all'; } catch (e) {}
+    wrap.append(renderHubPills());
+  }
+
+  const host = el('div', 'rails-host');
+  wrap.append(host);
+  const paint = (res) => {
+    host.querySelectorAll('.rail-section').forEach(sec => { if (sec._railIO) sec._railIO.disconnect(); });
+    host.replaceChildren();
+    res.rails.forEach(r => host.append(renderRailSection(r)));
+  };
+  paint(result);
+
+  if (type === 'tv' && typeof fetchHubRails === 'function') {
+    const hubId = state.home.hub || 'all';
+    fetchHubRails(hubId).then(extra => {
+      if (!host.isConnected) return;
+      const hubOpts = hubId === 'all'
+        ? Object.assign({}, opts, { extraRails: extra, limit: 20 })
+        : {
+            items: [], general: {}, generalPool: [], tvStreams: [],
+            seeds: [], seedRecs: [], topGenres: [], topCast: [], topDirectors: [],
+            topKeywords: [], names: {}, genreNames: {}, collections: [], criteria: [],
+            moods: {}, seedYears: [], decades: [],
+            type: 'tv', mode: 'none', nowYear: opts.nowYear, userId: opts.userId,
+            dateKey: opts.dateKey, nonce: 0, limit: 12, ratingOf: opts.ratingOf,
+            extraRails: extra
+          };
+      const merged = buildRails(hubOpts);
+      state.home.rails = merged;
+      paint(merged);
+    });
+  }
+}
+
+
+/* ================= HOVER PREVIEW (1.5s) ================= */
+(function initHoverPreview() {
+  if (typeof matchMedia === 'function' && !matchMedia('(hover: hover)').matches) return;
+  let timer = null, hideTimer = null, activeCard = null, preview = null;
+
+  const hide = () => {
+    clearTimeout(timer); clearTimeout(hideTimer);
+    activeCard = null;
+    if (preview) {
+      const iframe = preview.querySelector('iframe');
+      if (iframe) iframe.src = 'about:blank';
+      preview.classList.remove('visible');
+    }
+  };
+
+  const getPreview = () => {
+    if (preview && preview.isConnected) return preview;
+    preview = el('div', 'hover-preview');
+    preview.id = 'hover-preview';
+    (document.getElementById('results') || document.body).append(preview);
+    preview.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+    preview.addEventListener('mouseleave', hide);
+    return preview;
+  };
+
+  const show = (card) => {
+    const item = card && card._mcItem;
+    if (!item || !card.isConnected) return;
+    const p = getPreview();
+    p.replaceChildren();
+
+    const media = el('div', 'hp-media');
+    const img = el('img', 'hp-img');
+    const path = item.backdrop || item.poster;
+    if (path) img.src = TMDB_IMG + 'w780' + path;
+    img.alt = '';
+    media.append(img);
+
+    const body = el('div', 'hp-body');
+    body.append(el('div', 'hp-title', item.title || ''));
+    let meta = item.year || '';
+    const rr = (typeof imdbRef === 'function') ? imdbRef(item) : null;
+    if (rr && rr.rating > 0) meta += (meta ? ' · ' : '') + 'IMDb ' + rr.rating.toFixed(1);
+    if (item.tmdbRating) meta += (meta ? ' · ' : '') + 'TMDB ' + item.tmdbRating.toFixed(1);
+    if (typeof item._sortScore === 'number') meta += (meta ? ' · ' : '') + Math.round(item._sortScore * 100) + '% збіг';
+    body.append(el('div', 'hp-meta', meta));
+
+    const own = lib[item.key];
+    if (own) {
+      const r = computeItemRating(own);
+      if (r.avg > 0) body.append(el('div', 'hp-own', 'Ваша оцінка: ' + fmtNum(r.avg)));
+    }
+    if (item._reasons && item._reasons.length) body.append(el('div', 'hp-why', item._reasons.join(' · ')));
+
+    let desc = item.overview || '';
+    if (desc.length > 210) desc = desc.slice(0, 207).trimEnd() + '…';
+    body.append(el('p', 'hp-desc', desc || 'Опис поки відсутній.'));
+
+    const actions = el('div', 'hp-actions');
+    const trailer = el('button', 'hp-btn primary', '▶ Дивитись трейлер');
+    trailer.type = 'button';
+    trailer.onclick = async () => {
+      if (trailer.disabled) return;
+      trailer.disabled = true;
+      trailer.textContent = '⏳ Завантаження…';
+      let data = null;
+      try {
+        data = await tmdbFetch('/' + encodeURIComponent(item.type) + '/' + item.id + '?language=uk-UA&append_to_response=videos');
+      } catch (e) {}
+      if (!preview || !preview.isConnected) return;
+      const list = findAllTrailers(data && data.videos, data && data.original_language);
+      if (!list.length) {
+        showSyncToast('Трейлер не знайдено');
+        trailer.disabled = false;
+        trailer.textContent = '▶ Дивитись трейлер';
+        return;
+      }
+      const iframe = document.createElement('iframe');
+      iframe.title = 'Трейлер: ' + (item.title || '');
+      iframe.allow = 'autoplay; encrypted-media; picture-in-picture';
+      iframe.allowFullscreen = true;
+      iframe.src = 'https://www.youtube.com/embed/' + list[0].key + '?autoplay=1&rel=0';
+      media.replaceChildren(iframe);
+      const stop = el('button', 'hp-stop', '✕ Закрити трейлер');
+      stop.type = 'button';
+      stop.onclick = () => { iframe.src = 'about:blank'; media.replaceChildren(img); stop.remove(); trailer.disabled = false; trailer.textContent = '▶ Дивитись трейлер'; };
+      media.append(stop);
+      trailer.textContent = '▶ Трейлер грає';
+    };
+
+    const isPlanned = !!(lib[item.key] && lib[item.key].status === 'planned');
+    const plan = el('button', 'hp-btn' + (isPlanned ? ' active' : ''), isPlanned ? '✓ У плану' : '📅 Планую');
+    plan.type = 'button';
+    plan.onclick = () => {
+      updateCore(item, { status: isPlanned ? null : 'planned' });
+      showSyncToast(isPlanned ? 'Знято з «Планую»' : '📅 Додано у «Планую»');
+      plan.classList.toggle('active', !isPlanned);
+      plan.textContent = isPlanned ? '📅 Планую' : '✓ У плану';
+    };
+
+    const more = el('button', 'hp-btn', 'Детальніше');
+    more.type = 'button';
+    more.onclick = () => { hide(); openCard(item); };
+    actions.append(trailer, plan, more);
+    body.append(actions);
+
+    p.append(media, body);
+    p.style.visibility = 'hidden';
+    p.classList.add('visible');
+    const rect = card.getBoundingClientRect();
+    const w = p.offsetWidth || 360;
+    const h = p.offsetHeight || 420;
+    let left = rect.left;
+    if (left + w > window.innerWidth - 12) left = window.innerWidth - w - 12;
+    left = Math.max(12, left);
+    let top = rect.bottom + 10;
+    if (top + h > window.innerHeight - 12) top = rect.top - h - 10;
+    top = Math.max(12, top);
+    p.style.left = left + 'px';
+    p.style.top = top + 'px';
+    p.style.visibility = '';
+  };
+
+  document.addEventListener('mouseover', (e) => {
+    const el0 = e.target instanceof Element ? e.target : null;
+    const card = el0 && el0.closest('.rail-strip .rec-card');
+    if (!card || card === activeCard) return;
+    clearTimeout(timer); clearTimeout(hideTimer);
+    activeCard = card;
+    timer = setTimeout(() => show(card), 1500);
+  });
+  document.addEventListener('mouseout', (e) => {
+    const el0 = e.target instanceof Element ? e.target : null;
+    const card = el0 && el0.closest('.rail-strip .rec-card');
+    if (!card || card !== activeCard || card.contains(e.relatedTarget)) return;
+    clearTimeout(timer);
+    hideTimer = setTimeout(() => {
+      if (!preview || !preview.matches(':hover')) hide();
+    }, 180);
+  });
+  document.addEventListener('keydown', hide);
+  window.addEventListener('scroll', hide, { passive: true });
+})();
+
 function renderHomeContent(taste) {
   if (state.tab !== 'home') return;
   if (!state.home.view) {
@@ -1739,234 +2480,22 @@ function renderHomeContent(taste) {
 
   if (state.home.view === 'my') {
     updateTopTasteButton(taste);
-    /* [LAYOUT] На мобайлі блок смаку лишається на головній — верхньої панелі там немає. */
-    if (typeof isDesktopLayout === 'function' && !isDesktopLayout()) {
-      box.append(renderTasteSummary(taste || computeTasteVector()));
-    }
   }
 
   const wrap = el('div', 'home-wrap');
 
   if (state.home.view === 'my') {
     buildFactOfDayCard();
-
     const recs = state.home.recs;
+
     if (recs && recs.seeds > 0) {
-      const isMobile = typeof isDesktopLayout === 'function' && !isDesktopLayout();
-      const sec = el('section', 'home-section home-recs-panel');
-      const head = el('div', 'section-head');
-      head.style.alignItems = 'center';
-      head.append(el('h2', 'section-title', '✨ Для тебе'));
-      const headControls = el('div', 'home-head-controls');
-      headControls.append(buildHomeTypeSwitch(taste));
-      const headMoods = el('div', 'home-head-moods');
-      headMoods.append(renderMoodPills());
-      headControls.append(headMoods);
-      head.append(headControls);
-      sec.append(head);
-
-      const type = state.home.tab;
-      const allItems = recs.items.filter(x => x.type === type && !(typeof isTrackedInLib === 'function' ? isTrackedInLib(x.key) : !!lib[x.key]) && !(typeof isDismissed === 'function' && isDismissed(x.key)));
-      if (allItems.length) {
-        if (isMobile) {
-          /* Мобайл:原 логіка з HEAD — 14 тайтлів + «Показати ще» по 14. */
-          const shownCount = state.home.shown[type] || 14;
-          const visibleItems = allItems.slice(0, shownCount);
-          const grid = el('div', 'home-grid');
-          visibleItems.forEach(item => grid.append(recCard(item, true)));
-          sec.append(grid);
-          if (allItems.length > shownCount) {
-            const moreBtn = el('button', 'home-more', 'Показати ще');
-            moreBtn.type = 'button';
-            moreBtn.addEventListener('click', () => {
-              const current = state.home.shown[type] || 14;
-              const fresh = (state.home.recs?.items || []).filter(x =>
-                x.type === type &&
-                !(typeof isTrackedInLib === 'function' ? isTrackedInLib(x.key) : !!lib[x.key]) &&
-                !(typeof isDismissed === 'function' && isDismissed(x.key)));
-              const nextShown = Math.min(fresh.length, current + 14);
-              allItems.slice(current, nextShown).forEach(item => grid.append(recCard(item, true)));
-              state.home.shown[type] = nextShown;
-              if (nextShown >= fresh.length) moreBtn.remove();
-            });
-            sec.append(moreBtn);
-          }
-        } else {
-          const stripWrap = el('div', 'recs-strip-wrap');
-          const grid = el('div', 'home-grid recs-strip');
-          allItems.forEach(item => grid.append(recCard(item, true)));
-
-          const step = () => {
-            const card = grid.querySelector('.rec-card');
-            return card ? (card.getBoundingClientRect().width + 12) * 3 : 360;
-          };
-          const prev = el('button', 'recs-strip-arrow recs-strip-prev');
-          const next = el('button', 'recs-strip-arrow recs-strip-next');
-          prev.type = 'button'; next.type = 'button';
-          prev.title = 'Назад'; next.title = 'Далі';
-          prev.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
-          next.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
-          prev.addEventListener('click', () => grid.scrollBy({ left: -step(), behavior: 'smooth' }));
-          next.addEventListener('click', () => grid.scrollBy({ left: step(), behavior: 'smooth' }));
-
-          stripWrap.append(prev, grid, next);
-          sec.append(stripWrap);
-        }
-      } else {
-        sec.append(el('div', 'home-note', 'Немає рекомендацій у цьому режимі. Спробуй «Баланс» або інший настрій.'));
-      }
-
-    /* [LAYOUT] Кнопка оновлення — у шапці панелі, іконка в стилі верхнього меню. */
-    let refreshBtn;
-    if (isMobile) {
-      /* Оригінальна мобільна кнопка з HEAD. */
-      let cacheAge = '';
-      try {
-        const cached = typeof mcCacheGet === 'function' ? mcCacheGet(RECS_CACHE, null) : JSON.parse(localStorage.getItem(RECS_CACHE));
-        if (cached && cached.ts) {
-          const hrs = Math.floor((Date.now() - cached.ts) / 3600000);
-          cacheAge = hrs < 1 ? ' (щойно)' : (hrs < 24 ? ` (${hrs} год. тому)` : ` (${Math.floor(hrs / 24)} дн. тому)`);
-        }
-      } catch (e) {}
-      refreshBtn = el('button', 'home-more', '🔄 Оновити рекомендації' + cacheAge);
-      refreshBtn.style.marginTop = '12px';
-      refreshBtn.style.background = 'transparent';
-      refreshBtn.style.border = '1px solid var(--bg-3)';
+      renderHomeRails(recs, wrap);
     } else {
-      refreshBtn = el('button', 'home-refresh-btn');
-      refreshBtn.title = 'Оновити рекомендації';
-      refreshBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg><span>Оновити</span>';
+      wrap.append(el('div', 'home-note', 'Постав оцінку 7+ або ❤️ улюбленому фільму чи серіалу — і тут з\'являться персональні рекомендації.'));
     }
-    refreshBtn.type = 'button';
-    refreshBtn.addEventListener('click', () => {
-      if (typeof mcCacheDel === 'function') mcCacheDel(RECS_CACHE);
-      state.home.refreshNonce = (state.home.refreshNonce || 0) + 1;
-      state.home.sig = null; state.home.recs = null;
-      state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */;
-      state.home.genShown = {}; /* FIX-GENSHOWN-RESET */
-      refresh();
-      showSyncToast('✨ Оновлено');
-    });
-    /* [LAYOUT] Мобайл: кнопка під видачею, як і раніше; десктоп — у шапці панелі. */
-    (isMobile ? sec : head).append(refreshBtn);
-    wrap.append(sec);
-
-  } else if (recs && recs.seeds === 0) {
-    const sec = el('section', 'home-section');
-    sec.append(el('h2', 'section-title', '✨ Для тебе'));
-    sec.append(el('div', 'home-note', 'Постав оцінку 7+ або ❤️ улюбленому фільму чи серіалу — і тут з\'являться персональні рекомендації.'));
-    wrap.append(sec);
-  }
 
     const plannedSec = buildPlannedByMoodSection();
     if (plannedSec) wrap.append(plannedSec);
-  }
-
-  /* [LAYOUT] Тренди завжди під блоком «Планую», фільми й серіали окремо. */
-  if (state.home.general) {
-    const exploreHead = el('div', 'section-head');
-    exploreHead.style.alignItems = 'center';
-    exploreHead.append(el('h2', 'section-title', '🌍 Тренди і платформи'));
-    wrap.append(exploreHead);
-    const g = state.home.general;
-    if (!state.home.genShown) state.home.genShown = {};
-
-    const renderBlock = (blockId, title, sub, items, opts) => {
-      if (!items || !items.length) return;
-      const s = el('section', 'home-section');
-      const head = el('div', 'section-head');
-      const h2 = el('h2', 'section-title');
-      if (opts && opts.logo) {
-        const img = el('img', 'stream-head-logo');
-        img.src = TMDB_IMG + 'w154' + opts.logo;
-        img.alt = title;
-        img.loading = 'lazy';
-        h2.append(img);
-      } else if (opts && opts.isOther) {
-        const ic = document.createElement('span');
-        ic.className = 'stream-head-icon';
-        ic.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>';
-        h2.append(ic);
-      }
-      h2.append(el('span', '', title));
-      head.append(h2);
-      if (sub) head.append(el('span', 'section-sub', sub));
-      s.append(head);
-
-      const grid = el('div', 'home-grid');
-      let shown = state.home.genShown[blockId] || 16;
-      items.slice(0, shown).forEach(item => grid.append(recCard(item, false)));
-      s.append(grid);
-
-      if (items.length > shown) {
-        const moreBtn = el('button', 'home-more', 'Показати ще');
-        moreBtn.type = 'button';
-        moreBtn.addEventListener('click', () => {
-          const nextShown = Math.min(items.length, shown + 16);
-          items.slice(shown, nextShown).forEach(item => grid.append(recCard(item, false)));
-          shown = nextShown;
-          state.home.genShown[blockId] = shown;
-          if (shown >= items.length) moreBtn.remove();
-        });
-        s.append(moreBtn);
-      }
-      wrap.append(s);
-    };
-
-    const tvGenrePref = {};
-    Object.values(lib).forEach(x => {
-      if (x.type !== 'tv') return;
-      const avg = computeItemRating(x).avg;
-      if (avg < 7 && !x.favorite) return;
-      const w = ((avg || 8) / 10) * Math.max(0.2, tasteDecay(x.updated));
-      (x.genres || []).forEach(gid => { tvGenrePref[gid] = (tvGenrePref[gid] || 0) + w; });
-    });
-
-    const mixTvStreamItems = (stream) => {
-      const popPool = (stream.pop || []).filter(x => !(typeof isDismissed === 'function' && isDismissed(x.key)));
-      const newPool = (stream.fresh || []).filter(x => !(typeof isDismissed === 'function' && isDismissed(x.key)));
-
-      // Легка персоналізація популярного блоку: улюблені жанри вище, уже переглянуті/закинуті нижче
-      const rankedPop = popPool
-        .map((x, idx) => {
-          const saved = lib[x.key];
-          const seenPenalty = saved && (saved.status === 'watched' || saved.status === 'dropped') ? 100 : 0;
-          let gBoost = 0;
-          (x.genres || []).forEach(gid => { gBoost += (tvGenrePref[gid] || 0); });
-          return { x, sortVal: idx - Math.min(gBoost, 4) * 1.2 + seenPenalty };
-        })
-        .sort((a, b) => a.sortVal - b.sortVal)
-        .map(o => o.x);
-
-      const maxItems = 50;
-      const popPick = rankedPop.slice(0, 36);
-      const usedKeys = new Set(popPick.map(x => x.key));
-      const newPick = newPool.filter(x => !usedKeys.has(x.key)).slice(0, 20);
-
-      // Пропорція 2:1 до maxItems (до 50 карток)
-      const mixed = [];
-      let pi = 0, ni = 0;
-      while (mixed.length < maxItems && (pi < popPick.length || ni < newPick.length)) {
-        if (pi < popPick.length && mixed.length < maxItems) mixed.push(popPick[pi++]);
-        if (pi < popPick.length && mixed.length < maxItems) mixed.push(popPick[pi++]);
-        if (ni < newPick.length && mixed.length < maxItems) mixed.push(newPick[ni++]);
-      }
-      return mixed;
-    };
-
-    /* [LAYOUT] Видача залежить від вибраного типу: фільми або платформи/серіали. */
-    if (state.home.tab === 'movie' && g.trMovies && g.trMovies.length) {
-      wrap.append(el('div', 'section-head', '🎬 Фільми'));
-      renderBlock('trMovies', '🔥 Популярні фільми', 'сьогодні', g.trMovies);
-      renderBlock('newMovies', '🎬 Нові фільми', 'свіже', g.newMovies);
-      renderBlock('topMovies', '🏆 Найрейтинговіші фільми', 'класика', g.topMovies);
-    } else if (state.home.tab !== 'movie' && Array.isArray(g.tvStreams) && g.tvStreams.length) {
-      wrap.append(el('div', 'section-head', '📺 Платформи'));
-      g.tvStreams.forEach(st => {
-        const mixed = mixTvStreamItems(st);
-        renderBlock('tv-' + st.id, st.title, '', mixed, { logo: st.logo, isOther: st.id === 'other' });
-      });
-    }
   }
 
   box.append(wrap);

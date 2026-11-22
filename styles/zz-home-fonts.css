@@ -1,0 +1,301 @@
+/* Автогенеровано: шрифти вмісту головной +10%. Верхнє меню не зачіпаємо. */
+#results { font-size: calc(1.1 * 16px); }
+#results .hamburger { font-size: calc(1.1 * 22px); }
+#results input#q { font-size: calc(1.1 * 15px); }
+#results .ac-title { font-size: calc(1.1 * 14px); }
+#results .ac-meta { font-size: calc(1.1 * 12px); }
+#results .ac-footer { font-size: calc(1.1 * 13px); }
+#results .ac-empty { font-size: calc(1.1 * 14px); }
+#results .sidebar-logo { font-size: calc(1.1 * 26px); }
+#results .sidebar-email { font-size: calc(1.1 * 11px); }
+#results .nav-item { font-size: calc(1.1 * 15px); }
+#results .nav-icon { font-size: calc(1.1 * 16px); }
+#results .logout-btn-side { font-size: calc(1.1 * 14px); }
+#results .login-btn-side { font-size: calc(1.1 * 14px); }
+#results /* =========================================
+   AUTH BANNER & FILTERS
+   ========================================= */
+#auth-banner { font-size: calc(1.1 * 13px); }
+#results #auth-banner button { font-size: calc(1.1 * 12px); }
+#results .filter-btn { font-size: calc(1.1 * 13px); }
+#results .taste-summary-label { font-size: calc(1.1 * 14px); }
+#results .taste-summary-value { font-size: calc(1.1 * 15px); }
+#results .taste-summary-chevron { font-size: calc(1.1 * 12px); }
+#results .taste-card-title { font-size: calc(1.1 * 18px); }
+#results .taste-card-meta { font-size: calc(1.1 * 11px); }
+#results .taste-row-label { font-size: calc(1.1 * 12px); }
+#results .taste-row-val { font-size: calc(1.1 * 13px); }
+#results .taste-insight { font-size: calc(1.1 * 13px); }
+#results .taste-empty { font-size: calc(1.1 * 14px); }
+#results .mood-pill { font-size: calc(1.1 * 13px); }
+#results .section-title { font-size: calc(1.1 * 20px); }
+#results .section-sub { font-size: calc(1.1 * 11px); }
+#results .home-note { font-size: calc(1.1 * 13px); }
+#results .row-title { font-size: calc(1.1 * 12.5px); }
+#results .row-meta { font-size: calc(1.1 * 11px); }
+#results .rec-why { font-size: calc(1.1 * 10.5px); }
+#results .home-more { font-size: calc(1.1 * 13px); }
+#results .top-number { font-size: calc(1.1 * 12px); }
+#results .title { font-size: calc(1.1 * 15px); }
+#results .meta { font-size: calc(1.1 * 12px); }
+#results .badge { font-size: calc(1.1 * 12px); }
+#results .item-delete { font-size: calc(1.1 * 15px); }
+#results .item-fav { font-size: calc(1.1 * 15px); }
+#results .lib-search { font-size: calc(1.1 * 14px); }
+#results .library-sort-row label { font-size: calc(1.1 * 11px); }
+#results .library-sort-row select { font-size: calc(1.1 * 13px); }
+#results .filter-row label { font-size: calc(1.1 * 12px); }
+#results .filter-row select { font-size: calc(1.1 * 14px); }
+#results .filter-actions button { font-size: calc(1.1 * 13px); }
+#results .query-bar { font-size: calc(1.1 * 13px); }
+#results .query-bar button { font-size: calc(1.1 * 12px); }
+#results .avail-empty { font-size: calc(1.1 * 14px); }
+#results .mobile-hero .btn-play { font-size: calc(1.1 * 13px); }
+#results .mobile-hero .btn-stop { font-size: calc(1.1 * 13px); }
+#results .hero-badge { font-size: calc(1.1 * 18px); }
+#results .tv-icon-badge { font-size: calc(1.1 * 18px); }
+#results .tv-icon-badge.tv-icon-badge-letter { font-size: calc(1.1 * 16px); }
+#results .title-main { font-size: calc(1.1 * 32px); }
+#results .genres-left .genre-tag { font-size: calc(1.1 * 11px); }
+#results .btn-tags { font-size: calc(1.1 * 11px); }
+#results .age-badge { font-size: calc(1.1 * 11px); }
+#results .title-meta-text { font-size: calc(1.1 * 12px); }
+#results .tv-status { font-size: calc(1.1 * 11px); }
+#results .rating-tmdb { font-size: calc(1.1 * 13px); }
+#results .rating-imdb { font-size: calc(1.1 * 13px); }
+#results .rating-rt { font-size: calc(1.1 * 13px); }
+#results .rating-mc { font-size: calc(1.1 * 13px); }
+#results .title-watch-btn { font-size: calc(1.1 * 13px); }
+#results .uakino-grad-text { font-size: calc(1.1 * 15px); }
+#results .ai-grad-text { font-size: calc(1.1 * 14px); }
+#results .status-btn { font-size: calc(1.1 * 14px); }
+#results .overview-src button { font-size: calc(1.1 * 11.5px); }
+#results .overview-text { font-size: calc(1.1 * 14.5px); }
+#results .btn-read { font-size: calc(1.1 * 13px); }
+#results .score-title { font-size: calc(1.1 * 13px); }
+#results .btn-clear-ratings { font-size: calc(1.1 * 12px); }
+#results .score-label { font-size: calc(1.1 * 14px); }
+#results .score-val { font-size: calc(1.1 * 16.5px); }
+#results .score-total-label { font-size: calc(1.1 * 16.1px); }
+#results .score-total-val { font-size: calc(1.1 * 20px); }
+#results .tv-score-label { font-size: calc(1.1 * 18px); }
+#results .tv-score-val { font-size: calc(1.1 * 22px); }
+#results .score-empty-text { font-size: calc(1.1 * 14px); }
+#results .card-tab { font-size: calc(1.1 * 16.1px); }
+#results .streams-head-title { font-size: calc(1.1 * 16px); }
+#results .streams-close-btn { font-size: calc(1.1 * 17px); }
+#results .streams-prov-btn { font-size: calc(1.1 * 13px); }
+#results .streams-prov-cnt { font-size: calc(1.1 * 11px); }
+#results .streams-match-cur { font-size: calc(1.1 * 13px); }
+#results .streams-match-yr { font-size: calc(1.1 * 11.5px); }
+#results .streams-alt-toggle { font-size: calc(1.1 * 12px); }
+#results .streams-alt-item { font-size: calc(1.1 * 13px); }
+#results .streams-ctrl-label { font-size: calc(1.1 * 10.5px); }
+#results .streams-chip { font-size: calc(1.1 * 12.5px); }
+#results .streams-select { font-size: calc(1.1 * 13.5px); }
+#results .streams-play-btn { font-size: calc(1.1 * 15.5px); }
+#results .streams-ep-btn { font-size: calc(1.1 * 13.5px); }
+#results .streams-ep-qual { font-size: calc(1.1 * 11px); }
+#results .streams-status { font-size: calc(1.1 * 14px); }
+#results .streams-error { font-size: calc(1.1 * 13.5px); }
+#results /* FIX-SIDEBAR-MOBILE-EVEN */
+
+
+/* RELEASE SCHEDULE */
+.release-tag { font-size: calc(1.1 * 11px); }
+#results /* STAGE1-UX-UPGRADES */
+.cw-next-btn { font-size: calc(1.1 * 10.5px); }
+#results .rw-cnt { font-size: calc(1.1 * 12px); }
+#results .note-edit-btn { font-size: calc(1.1 * 14px); }
+#results .quick-rate-lbl { font-size: calc(1.1 * 11px); }
+#results .quick-rate-pill { font-size: calc(1.1 * 12px); }
+#results .quick-rate-copy { font-size: calc(1.1 * 11.5px); }
+#results .streams-ep-watched { font-size: calc(1.1 * 12px); }
+#results .streams-mark-txt { font-size: calc(1.1 * 12.5px); }
+#results .streams-mark-yes { font-size: calc(1.1 * 12px); }
+#results .streams-mark-no { font-size: calc(1.1 * 12px); }
+#results .home-view-pill { font-size: calc(1.1 * 13.5px); }
+#results .home-inline-pill { font-size: calc(1.1 * 12.5px); }
+#results .world-map-title { font-size: calc(1.1 * 11.5px); }
+#results .world-map-tip { font-size: calc(1.1 * 12px); }
+#results .wrapped-bar-num { font-size: calc(1.1 * 10px); }
+#results .wrapped-bar-lbl { font-size: calc(1.1 * 9.5px); }
+#results .detail-label { font-size: calc(1.1 * 11px); }
+#results .detail-value { font-size: calc(1.1 * 14px); }
+#results .actor-tile-name { font-size: calc(1.1 * 11.5px); }
+#results .actor-tile-role { font-size: calc(1.1 * 10.5px); }
+#results .similar-title { font-size: calc(1.1 * 12px); }
+#results .similar-meta { font-size: calc(1.1 * 10.5px); }
+#results .season-tab-btn { font-size: calc(1.1 * 13px); }
+#results .season-tab-badge { font-size: calc(1.1 * 10px); }
+#results .episode-poster-empty { font-size: calc(1.1 * 20px); }
+#results .episode-num { font-size: calc(1.1 * 10px); }
+#results .episode-title { font-size: calc(1.1 * 13.5px); }
+#results .episode-expand-icon { font-size: calc(1.1 * 11px); }
+#results .episode-desc { font-size: calc(1.1 * 11.5px); }
+#results .notes-hint { font-size: calc(1.1 * 12px); }
+#results .tags-modal-header h3 { font-size: calc(1.1 * 18px); }
+#results .tags-modal-close { font-size: calc(1.1 * 20px); }
+#results .tag-item { font-size: calc(1.1 * 13px); }
+#results .person-name { font-size: calc(1.1 * 26px); }
+#results .person-meta { font-size: calc(1.1 * 12.5px); }
+#results .person-bio { font-size: calc(1.1 * 14.5px); }
+#results .filmography-title { font-size: calc(1.1 * 12.5px); }
+#results .filmography-year { font-size: calc(1.1 * 11px); }
+#results #poster-zoom .zoom-close { font-size: calc(1.1 * 22px); }
+#results .sync-indicator { font-size: calc(1.1 * 11px); }
+#results .auth-box h2 { font-size: calc(1.1 * 20px); }
+#results .settings-box h2 { font-size: calc(1.1 * 20px); }
+#results .auth-input { font-size: calc(1.1 * 14px); }
+#results .auth-btn { font-size: calc(1.1 * 14px); }
+#results .auth-btn.secondary { font-size: calc(1.1 * 12.5px); }
+#results .auth-error { font-size: calc(1.1 * 12px); }
+#results .onb-header h1 { font-size: calc(1.1 * 22px); }
+#results .onb-header p { font-size: calc(1.1 * 13px); }
+#results .onb-category-title { font-size: calc(1.1 * 16px); }
+#results .onb-card.selected::after { font-size: calc(1.1 * 13px); }
+#results .onb-title { font-size: calc(1.1 * 11.5px); }
+#results .onb-btn { font-size: calc(1.1 * 15px); }
+#results .stat-value { font-size: calc(1.1 * 32px); }
+#results .stat-label { font-size: calc(1.1 * 11px); }
+#results .stats-list-row { font-size: calc(1.1 * 13px); }
+#results .pie-title { font-size: calc(1.1 * 14px); }
+#results .pie-legend-row { font-size: calc(1.1 * 13px); }
+#results .histogram-row { font-size: calc(1.1 * 12px); }
+#results .histogram-bar { font-size: calc(1.1 * 10px); }
+#results .actor-rank-num { font-size: calc(1.1 * 14px); }
+#results .actor-rank-photo-empty { font-size: calc(1.1 * 16px); }
+#results .actor-rank-name { font-size: calc(1.1 * 14px); }
+#results .actor-rank-meta { font-size: calc(1.1 * 11px); }
+#results .actor-adjust-btn { font-size: calc(1.1 * 11px); }
+#results .actor-rank-value { font-size: calc(1.1 * 15px); }
+#results .cast-loader-text { font-size: calc(1.1 * 12px); }
+#results .cast-loader-btn { font-size: calc(1.1 * 13px); }
+#results .elo-rank { font-size: calc(1.1 * 13px); }
+#results .elo-title { font-size: calc(1.1 * 13px); }
+#results .elo-games { font-size: calc(1.1 * 10.5px); }
+#results .elo-value { font-size: calc(1.1 * 14px); }
+#results .insight-label { font-size: calc(1.1 * 10px); }
+#results .insight-text { font-size: calc(1.1 * 14px); }
+#results .trend-labels { font-size: calc(1.1 * 12px); }
+#results .trend-legend { font-size: calc(1.1 * 10px); }
+#results .game-title { font-size: calc(1.1 * 28px); }
+#results .game-subtitle { font-size: calc(1.1 * 13px); }
+#results .game-stats { font-size: calc(1.1 * 12px); }
+#results .game-stats span { font-size: calc(1.1 * 14px); }
+#results .game-vs-label { font-size: calc(1.1 * 11px); }
+#results .game-card-title { font-size: calc(1.1 * 15px); }
+#results .game-card-meta { font-size: calc(1.1 * 11.5px); }
+#results .game-card-elo { font-size: calc(1.1 * 11px); }
+#results .game-card-crown { font-size: calc(1.1 * 22px); }
+#results .game-btn { font-size: calc(1.1 * 14px); }
+#results .game-history h3 { font-size: calc(1.1 * 16px); }
+#results .history-item { font-size: calc(1.1 * 12px); }
+#results .history-item .hi-title { font-size: calc(1.1 * 13px); }
+#results .history-item .hi-meta { font-size: calc(1.1 * 10.5px); }
+#results .elo-delta { font-size: calc(1.1 * 11px); }
+#results .game-over h2 { font-size: calc(1.1 * 28px); }
+#results .calendar-select { font-size: calc(1.1 * 14px); }
+#results .timeline-date { font-size: calc(1.1 * 13px); }
+#results /* ============ CENTER TOAST ============ */
+.center-toast { font-size: calc(1.1 * 16px); }
+#results /* --- Історія пошуку --- */
+.ac-header { font-size: calc(1.1 * 11px); }
+#results .filter-dropdown-title { font-size: calc(1.1 * 16px); }
+#results .filter-dropdown-close { font-size: calc(1.1 * 15px); }
+#results .filter-summary-chips { font-size: calc(1.1 * 13px); }
+#results .filter-summary-btn { font-size: calc(1.1 * 12px); }
+#results .nav-group-btn { font-size: calc(1.1 * 15px); }
+#results .nav-caret { font-size: calc(1.1 * 11px); }
+#results .nav-group-btn { font-size: calc(1.1 * 13px); }
+#results #sidebar .nav-more-menu .nav-group-btn { font-size: calc(1.1 * 10.5px); }
+#results .rec-dismiss { font-size: calc(1.1 * 11px); }
+#results .recs-mode-pill { font-size: calc(1.1 * 12.5px); }
+#results .roulette-btn { font-size: calc(1.1 * 12.5px); }
+#results .series-prog-val { font-size: calc(1.1 * 12px); }
+#results .game-source-pill { font-size: calc(1.1 * 13px); }
+#results .cal-best-btn { font-size: calc(1.1 * 12.5px); }
+#results .person-lib-badge { font-size: calc(1.1 * 12px); }
+#results .person-bio-source { font-size: calc(1.1 * 11px); }
+#results .person-wiki-link { font-size: calc(1.1 * 12px); }
+#results .franchise-chev { font-size: calc(1.1 * 12px); }
+#results .mood-pill { font-size: calc(1.1 * clamp(11px, 1vw, 13px)); }
+#results /* FIX-ACTOR-BTN-SIZE — tap target 22→30px для mobile a11y */
+.actor-adjust-btn { font-size: calc(1.1 * 13px); }
+#results /* FIX-RELEASE-REC-BADGE-CSS — badge on poster (home) */
+.rec-badge { font-size: calc(1.1 * 12px); }
+#results .settings-group-btn { font-size: calc(1.1 * 15px); }
+#results .settings-group-icon { font-size: calc(1.1 * 18px); }
+#results .settings-group-arrow { font-size: calc(1.1 * 22px); }
+#results .settings-back { font-size: calc(1.1 * 18px); }
+#results .settings-field-label { font-size: calc(1.1 * 12px); }
+#results .settings-field { font-size: calc(1.1 * 13px); }
+#results .settings-field-status { font-size: calc(1.1 * 12px); }
+#results .settings-box h2 { font-size: calc(1.1 * 22px); }
+#results .settings-section-title { font-size: calc(1.1 * 12px); }
+#results .settings-subsection-label { font-size: calc(1.1 * 12.5px); }
+#results .settings-toggle { font-size: calc(1.1 * 14.5px); }
+#results .settings-btn { font-size: calc(1.1 * 14px); }
+#results .settings-close { font-size: calc(1.1 * 22px); }
+#results .account-menu-item { font-size: calc(1.1 * 14px); }
+#results .quick-note-header h3 { font-size: calc(1.1 * 18px); }
+#results .quick-note-close { font-size: calc(1.1 * 20px); }
+#results .quick-note-textarea { font-size: calc(1.1 * 15px); }
+#results .quick-note-btn { font-size: calc(1.1 * 14px); }
+#results /* FIX-NOTES-TIMELINE */
+.btn-add-note { font-size: calc(1.1 * 14px); }
+#results .note-date { font-size: calc(1.1 * 11px); }
+#results .note-del-btn { font-size: calc(1.1 * 14px); }
+#results .note-content { font-size: calc(1.1 * 14.5px); }
+#results .card-x { font-size: calc(1.1 * 22px); }
+#results .note-feed-date { font-size: calc(1.1 * 11px); }
+#results .note-feed-title { font-size: calc(1.1 * 13px); }
+#results .note-feed-text { font-size: calc(1.1 * 14px); }
+#results .home-hero-badge { font-size: calc(1.1 * 11px); }
+#results .home-hero-title { font-size: calc(1.1 * clamp(30px, 3.4vw, 52px)); }
+#results .home-hero-meta { font-size: calc(1.1 * 12px); }
+#results .home-hero-why { font-size: calc(1.1 * 13px); }
+#results .hero-btn { font-size: calc(1.1 * 13px); }
+#results .rail-head .section-sub { font-size: calc(1.1 * 12px); }
+#results .rail-expand { font-size: calc(1.1 * 11px); }
+#results .rec-match { font-size: calc(1.1 * 10px); }
+#results .rec-poster-wrap::before { font-size: calc(1.1 * 15px); }
+#results /* Назва поверх горизонтального постера (або український логотип) */
+.wide-poster-title { font-size: calc(1.1 * clamp(13px, 1.05vw, 17px)); }
+#results .desktop-details-block .detail-label { font-size: calc(1.1 * 13.2px); }
+#results .desktop-details-block .detail-value { font-size: calc(1.1 * 14.3px); }
+#results /* Стилі для правої колонки (трохи більші шрифти) */
+  .card-desktop-right .title-main { font-size: calc(1.1 * 42px); }
+#results .card-desktop-right .score-total-label { font-size: calc(1.1 * 24px); }
+#results .card-desktop-right .score-total-val { font-size: calc(1.1 * 24px); }
+#results .studio-chip { font-size: calc(1.1 * 13.5px); }
+#results .sidebar-logo { font-size: calc(1.1 * 24px); }
+#results .taste-top-value { font-size: calc(1.1 * 12px); }
+#results .nav-item { font-size: calc(1.1 * 13px); }
+#results /* [LAYOUT] Підказка над рядком: шрифт як у плейсхолдера { font-size: calc(1.1 * 15px); }
+#results градієнт як у назви фільму. */
+  .search-hint { font-size: calc(1.1 * 15px); }
+#results .home-recs-panel .home-inline-pill { font-size: calc(1.1 * 14.4px); }
+#results .home-recs-panel .home-refresh-btn { font-size: calc(1.1 * 13.5px); }
+#results .ep-reaction-trigger.has-reaction { font-size: calc(1.1 * 20px); }
+#results .reaction-emoji-btn { font-size: calc(1.1 * 32px); }
+#results /* FIX-MISSING-UI-CSS-V1 */
+.label { font-size: calc(1.1 * 12px); }
+#results .episode-card.watched .episode-poster-wrap::after { font-size: calc(1.1 * 12px); }
+#results .fact-card-badge { font-size: calc(1.1 * 11px); }
+#results .fact-card-close { font-size: calc(1.1 * 12px); }
+#results .fact-card-text { font-size: calc(1.1 * 13.5px); }
+#results .fact-card-link { font-size: calc(1.1 * 12.5px); }
+#results .fact-modal .fact-card-text { font-size: calc(1.1 * 14px); }
+#results .company-logo-box.empty { font-size: calc(1.1 * 36px); }
+#results .company-parent-chip { font-size: calc(1.1 * 12px); }
+#results .company-desc { font-size: calc(1.1 * 13.5px); }
+#results .temp-avatar-title { font-size: calc(1.1 * 18px); }
+#results .temp-avatar-badge { font-size: calc(1.1 * 11px); }
+#results .temp-avatar-sub { font-size: calc(1.1 * 13px); }
+#results .temp-avatar-meta { font-size: calc(1.1 * 11px); }
+#results .temp-proj-chip { font-size: calc(1.1 * 11.5px); }
+#results .country-flag-box { font-size: calc(1.1 * 22px); }
+#results /* FIX-OBS-SHARE-CSS */
+.obs-share-btn { font-size: calc(1.1 * 13px); }
+#results .share-modal-head h3 { font-size: calc(1.1 * 17px); }

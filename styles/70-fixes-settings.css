@@ -7,14 +7,14 @@
 
 
 /* FIX-SEARCH-GLASS-THEME — color follows current theme (bg-1 at 65%, text at 8%) */
-@media (min-width: 900px) and (min-height: 600px) {
+
   .search-container {
     background: rgba(15, 14, 19, 0.65); /* fallback: navy */
     background: color-mix(in srgb, var(--bg-1) 65%, transparent);
     border: 1px solid rgba(var(--white-rgb), .08); /* fallback */
     border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
   }
-}
+
 
 
 

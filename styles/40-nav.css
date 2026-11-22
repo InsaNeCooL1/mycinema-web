@@ -187,7 +187,7 @@
 .logout-btn-side.logged-in .account-dot { display: block; }
 
 /* ДЕКСТОПНІ ПЕРЕВИЗНАЧЕННЯ ДЛЯ МЕНЮ, ДРОПДАУНІВ І ЗНАЧКІВ */
-@media (min-width: 900px) and (min-height: 600px) {
+
   #sidebar {
     width: 100%;
     max-width: 100%;
@@ -336,12 +336,4 @@
     right: 0;
     width: min(460px, 100%);
   }
-}
-
-/* [LAYOUT] Колишній інлайн-стиль кнопки налаштувань перенесено сюди,
-   щоб десктоп-правила покладалися лише на каскад. Мобайл виглядає як раніше. */
-html[data-layout="mobile"] .settings-compact-btn {
-  border-color: var(--accent);
-  color: var(--accent);
-}
 

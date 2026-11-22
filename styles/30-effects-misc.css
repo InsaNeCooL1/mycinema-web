@@ -1,12 +1,9 @@
 /* =========================================
    MEDIA QUERIES (DESKTOP) - УНІФІКОВАНО
    ========================================= */
-@media (max-width: 520px) {
-  .taste-body { grid-template-columns: 1fr; gap: 10px; }
-  .taste-radar-wrap { max-width: 240px; margin: 0 auto; }
-}
 
-@media (min-width: 900px) {
+
+
   /* Тепер всі контейнери мають однакову ширину і не "їдуть" */
   #results, .home-wrap, .game-container, .taste-summary-container { max-width: 1000px; }
   
@@ -19,7 +16,7 @@
   .taste-body { grid-template-columns: 280px 1fr; gap: 32px; }
 
 
-}
+
 
 /* =========================================
    CALENDAR / TIMELINE
@@ -91,11 +88,11 @@
   backdrop-filter: blur(10px);
 }
 
-@media (min-width: 1200px) {
+
   #results, .home-wrap, .game-container, .taste-summary-container { max-width: 1300px; }
   .home-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
   .filter-bar { max-width: 1268px; }
-}
+
 
 /* =========================================
    RIPPLE & MISC

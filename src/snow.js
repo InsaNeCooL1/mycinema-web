@@ -8,8 +8,8 @@
   function isEnabled() {
     const v = localStorage.getItem(KEY);
     if (v !== null) return v === 'true';
-    const m = new Date().getMonth();
-    return m === 11 || m === 0 || m === 1;
+    // WEB — десктопний клієнт: анімовані шари снігу за замовчуванням вимкнені.
+    return false;
   }
 
   function apply() {

@@ -2,7 +2,6 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MyCinema · Плеєр</title>
 <style>
   :root {
@@ -152,7 +151,7 @@
     clearTimeout(hideTimer);
     hideTimer = setTimeout(function () { if (!video.paused) hud.hidden = true; }, 3500);
   }
-  ['mousemove','touchstart','keydown','click'].forEach(function (ev) {
+  ['mousemove','keydown','click'].forEach(function (ev) {
     document.addEventListener(ev, showHud, { passive:true });
   });
   video.addEventListener('play', showHud);

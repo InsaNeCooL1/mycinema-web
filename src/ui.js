@@ -43,7 +43,6 @@ document.getElementById('poster-zoom').addEventListener('click', (e) => {
 // ========== NAV DROPDOWNS & PRIORITY+ ==========
 /* [LAYOUT][DESKTOP] Іконка на верхній панелі відкриває/закриває рядок пошуку. */
 function toggleDesktopSearch() {
-  if (typeof isDesktopLayout === 'function' && !isDesktopLayout()) return;
   const open = document.body.classList.toggle('mc-search-open');
   if (open) {
     const input = document.getElementById('q');
@@ -52,27 +51,19 @@ function toggleDesktopSearch() {
 }
 
 function closeNavDropdowns() {
-  if (isDesktopLayout()) {
-    document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
-  }
+  document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
 }
 
 function toggleNavGroup(groupName, e) {
   if (e) e.stopPropagation();
   const group = document.querySelector(`.nav-group[data-group="${groupName}"]`);
   if (!group) return;
-  const isOpen = group.classList.contains('open');
-  const isDesktop = isDesktopLayout();
-  if (isDesktop) {
-    document.querySelectorAll('.nav-group.open').forEach(g => {
-      if (g !== group) g.classList.remove('open');
-    });
-    if (typeof hideFilterDropdown === 'function') hideFilterDropdown();
-    if (typeof hideAutocomplete === 'function') hideAutocomplete();
-  }
-  /* [LAYOUT] На десктопі група вже відкривається по наведенню — клік не закриває її. */
-  if (isDesktop) { group.classList.add('open'); return; }
-  group.classList.toggle('open', !isOpen);
+  document.querySelectorAll('.nav-group.open').forEach(g => {
+    if (g !== group) g.classList.remove('open');
+  });
+  if (typeof hideFilterDropdown === 'function') hideFilterDropdown();
+  if (typeof hideAutocomplete === 'function') hideAutocomplete();
+  group.classList.add('open');
 }
 
 /* [LAYOUT] Десктоп: підменю «Списки», «Огляд» тощо розкриваються по наведенню. */
@@ -80,13 +71,11 @@ function toggleNavGroup(groupName, e) {
   document.querySelectorAll('#sidebar .nav-group').forEach(group => {
     let closeTimer = null;
     group.addEventListener('mouseenter', () => {
-      if (!isDesktopLayout()) return;
       if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
       closeNavDropdowns();
       group.classList.add('open');
     });
     group.addEventListener('mouseleave', () => {
-      if (!isDesktopLayout()) return;
       /* Невелика затримка: місток між кнопкою й меню + повернення курсору не закривають список. */
       closeTimer = setTimeout(() => group.classList.remove('open'), 180);
     });
@@ -101,20 +90,16 @@ function toggleNavGroup(groupName, e) {
   if (!nav || !sidebar || !moreGroup || !moreMenu) return;
 
   const topItems = Array.from(nav.querySelectorAll(':scope > .nav-top-item'));
-  const desktopMQ = DESKTOP_MQ;
   let hasMoved = false;
 
   function updatePriorityNav() {
-    if (!desktopMQ.matches) {
-      if (hasMoved) {
-        topItems.forEach(item => nav.insertBefore(item, moreGroup));
-        moreGroup.style.display = 'none';
-        moreGroup.classList.remove('open', 'has-active');
-        hasMoved = false;
-      }
+    if (window.innerWidth >= 1100) {
+      topItems.forEach(item => nav.insertBefore(item, moreGroup));
+      moreGroup.style.display = 'none';
+      moreGroup.classList.remove('open', 'has-active');
+      hasMoved = false;
       return;
     }
-
     if (hasMoved) {
       topItems.forEach(item => nav.insertBefore(item, moreGroup));
       hasMoved = false;

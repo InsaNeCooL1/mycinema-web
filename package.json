@@ -1,7 +1,7 @@
 {
-  "name": "mycinema",
+  "name": "mycinema-web",
   "version": "1.0.0",
-  "description": "",
+  "description": "MyCinema WEB — desktop-only web client",
   "main": "index.js",
   "scripts": {
     "build": "node build.js",
@@ -20,12 +20,6 @@
     "url": "https://github.com/InsaNeCool1/MyCinema/issues"
   },
   "homepage": "https://github.com/InsaNeCool1/MyCinema#readme",
-  "dependencies": {
-    "@capacitor/android": "^8.6.0",
-    "@capacitor/app": "^8.1.2",
-    "@capacitor/cli": "^8.6.0",
-    "@capacitor/core": "^8.6.0"
-  },
   "devDependencies": {
     "esbuild": "^0.28.2",
     "jsdom": "^31.0.1",

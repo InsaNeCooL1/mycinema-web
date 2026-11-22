@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 
 beforeAll(() => {
-  window.loadScript('src/card/mobile.js');
+  window.loadScript('src/card/ui-kit.js');
 });
 
 function ratingsRow(omdb, type = 'movie') {
@@ -26,16 +26,18 @@ describe('Metacritic badge на картці фільму', () => {
       'rating-tmdb', 'rating-imdb', 'rating-rt', 'rating-mc',
     ]);
     const mc = row.querySelector('.rating-mc');
-    expect(mc.textContent).toBe('Meta:81');
-    expect(mc.querySelector('span').className).toBe('temp-green');
+    expect(mc.querySelectorAll('span')[1].textContent).toBe('81');
+    expect(mc.querySelector('.rate-chip')).toBeTruthy();
+    expect(mc.querySelectorAll('span')[1].className).toBe('temp-green');
   });
 
   it('падає назад на Metascore і пропускає N/A', () => {
     const row = ratingsRow({ Metascore: '58' });
     const mc = row.querySelector('.rating-mc');
     expect(mc).not.toBeNull();
-    expect(mc.textContent).toBe('Meta:58');
-    expect(mc.querySelector('span').className).toBe('temp-orange');
+    expect(mc.querySelectorAll('span')[1].textContent).toBe('58');
+    expect(mc.querySelector('.rate-chip')).toBeTruthy();
+    expect(mc.querySelectorAll('span')[1].className).toBe('temp-orange');
 
     const na = ratingsRow({ Ratings: [{ Source: 'Metacritic', Value: 'N/A' }] });
     expect(na.querySelector('.rating-mc')).toBeNull();
@@ -63,9 +65,8 @@ describe('Кнопки перегляду на картці', () => {
     return window.MC.createActions({ item, details: { title: 'Test' } });
   }
 
-  it('не дублює AI-кнопку між UA KINO та Онлайн', () => {
-    let opened = 0;
-    window.mcChat = { enabled: () => true, open: () => { opened++; } };
+  it('не дублює AI-кнопку і лишає лише одну головну дію «Дивитись»', () => {
+    window.mcChat = { enabled: () => true, open: () => {} };
     window.mcRoom.enabled = () => true;
     window.mcRoom.open = () => {};
 
@@ -73,19 +74,17 @@ describe('Кнопки перегляду на картці', () => {
     expect(row.querySelector('.btn-ai')).toBeFalsy();
     expect(row.textContent).not.toContain('AI');
     expect([...row.querySelectorAll('.btn-uakino')].map(b => b.textContent.trim()))
-      .toEqual(['UA KINO', 'Онлайн']);
+      .toEqual(['▶ Дивитись']);
   });
 
-  it('кнопка Онлайн відкриває кімнату з контекстом картки', () => {
+  it('кнопка «Дивитись» відкриває вибір джерела', () => {
     let opened = null;
-    window.mcRoom.enabled = () => true;
-    window.mcRoom.open = (ctx) => { opened = ctx; };
+    window.openStreamPicker = (title, year, type, imdb, orig, ctx) => { opened = ctx; };
 
     const row = actions();
-    const online = [...row.querySelectorAll('.btn-uakino')]
-      .find(b => b.textContent.trim() === 'Онлайн');
-    expect(online).toBeTruthy();
-    online.click();
-    expect(opened).toMatchObject({ key: 'movie-1', type: 'movie', title: 'Test' });
+    const watch = row.querySelector('.btn-watch-primary');
+    expect(watch).toBeTruthy();
+    watch.click();
+    expect(opened).toMatchObject({ key: 'movie-1' });
   });
 });

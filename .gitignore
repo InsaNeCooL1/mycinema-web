@@ -1,26 +1,9 @@
 # ============================================
-# MyCinema — .gitignore
+# MyCinema WEB — .gitignore
 # ============================================
-
-# Web build (Capacitor output)
-www/
 
 # Dependencies
 node_modules/
-
-# Android build artifacts
-android/build/
-android/app/build/
-android/.gradle/
-android/capacitor-cordova-android-plugins/build/
-android/local.properties
-
-# APK / archives
-*.apk
-*.aab
-*.tgz
-*.tar.gz
-*.zip
 
 # IDE / OS
 .idea/

@@ -2,15 +2,16 @@
 
 function syncNavActive() {
   const t = state.tab;
-  document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.tab === t));
+  document.querySelectorAll(".nav-item").forEach(b => {
+    let active = b.dataset.tab === t;
+    if (t === 'home' && b.dataset.hometype) active = b.dataset.hometype === (state.home && state.home.tab);
+    if (t === 'home' && b.dataset.tab === 'home') active = false;
+    b.classList.toggle("active", active);
+  });
   document.querySelectorAll(".nav-group").forEach(g => {
     const hasActive = !!g.querySelector('.nav-item.active');
     g.classList.toggle('has-active', hasActive);
-    if (isDesktopLayout()) {
-      g.classList.remove('open');
-    } else if (hasActive) {
-      g.classList.add('open');
-    }
+    g.classList.remove('open');
   });
   const moreGroup = document.querySelector('.nav-more-group');
   if (moreGroup) moreGroup.classList.toggle('has-active', !!moreGroup.querySelector('.nav-item.active'));
@@ -56,6 +57,7 @@ function setTab(t, opts) {
     return;
   }
   _cardClosingForNav = false;
+  if (t !== 'settings' && typeof restoreSettingsPageBoxes === 'function') restoreSettingsPageBoxes();
   state.tab = t;
   if (typeof VALID_TABS !== 'undefined' && VALID_TABS.has(t)) {
     try { localStorage.setItem('mycinema.activeTab', t); } catch {}
@@ -96,8 +98,16 @@ function setTypeFilter(f) {
   if (state.tab === "filter") renderFilter(); else renderLibrary();
 }
 
+(function initHeaderScroll() {
+  const update = () => document.body.classList.toggle('scrolled', (window.scrollY || 0) >= 40);
+  window.addEventListener('scroll', update, { passive: true });
+  update();
+})();
+
 function refresh() {
   if (state.tab === "home") loadHome();
+  else if (state.tab === "streamings") renderStreamings();
+  else if (state.tab === "settings") renderSettingsPage();
   else if (state.tab === "filter") renderFilter();
   else if (state.tab === "game") renderGame();
   else if (state.tab === "statistics") renderStatistics();
@@ -109,124 +119,6 @@ function refresh() {
 
 window.addEventListener('firebase-ready', syncFromCloud);
 
-// ========== COLD START SPLASH (APK only, 3s) ==========
-const SPLASH_POOL_KEY = 'mycinema.splashPool.v1';
-const SPLASH_POOL_TTL = 12 * 60 * 60 * 1000;
-const SPLASH_DURATION_MS = 1500; /* FIX-SPLASH-SHORT */
-
-function readSplashPool() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(SPLASH_POOL_KEY));
-    if (raw && Array.isArray(raw.items) && raw.items.length) return raw;
-  } catch {}
-  return null;
-}
-
-function writeSplashPool(items) {
-  try {
-    localStorage.setItem(SPLASH_POOL_KEY, JSON.stringify({ ts: Date.now(), items }));
-  } catch {}
-}
-
-function initColdSplash() {
-  if (document.getElementById('cold-splash')) return;
-
-  const splash = document.createElement('div');
-  splash.id = 'cold-splash';
-  splash.className = 'cold-splash';
-
-  const mediaWrap = document.createElement('div');
-  mediaWrap.className = 'splash-media';
-
-  const vignette = document.createElement('div');
-  vignette.className = 'splash-vignette';
-
-  const content = document.createElement('div');
-  content.className = 'splash-content';
-
-  const logo = document.createElement('div');
-  logo.className = 'splash-logo';
-  logo.textContent = 'MyCinema';
-
-  const status = document.createElement('div');
-  status.className = 'splash-status';
-  status.append(document.createTextNode('Завантажуємо'));
-  const dot = document.createElement('span');
-  dot.className = 'splash-dot';
-  dot.textContent = '.';
-  status.append(dot);
-
-  content.append(logo, status);
-  splash.append(mediaWrap, vignette, content);
-  document.body.appendChild(splash);
-
-  const applyPick = (pick) => {
-    if (!pick || !splash.isConnected) return;
-    const desktopPath = pick.backdrop || pick.poster;
-    const mobilePath = pick.poster || pick.backdrop;
-    if (!desktopPath && !mobilePath) return;
-
-    mediaWrap.replaceChildren();
-    const pic = document.createElement('picture');
-    pic.className = 'splash-picture';
-
-    if (desktopPath) {
-      const srcDesk = document.createElement('source');
-      srcDesk.media = '(min-width: 900px) and (min-height: 600px)';
-      srcDesk.srcset = TMDB_IMG + 'w1280' + desktopPath;
-      pic.append(srcDesk);
-    }
-
-    const img = document.createElement('img');
-    img.className = 'splash-bg-img';
-    img.alt = '';
-    img.decoding = 'async';
-    img.addEventListener('load', () => img.classList.add('loaded'));
-    img.src = TMDB_IMG + 'w780' + mobilePath;
-    if (img.complete) img.classList.add('loaded');
-
-    pic.append(img);
-    mediaWrap.append(pic);
-  };
-
-  const cached = readSplashPool();
-  if (cached) {
-    const pick = cached.items[Math.floor(Math.random() * cached.items.length)];
-    applyPick(pick);
-  }
-
-  // Оновлення пулу популярних фільмів TMDB (або перше завантаження)
-  if (!cached || (Date.now() - (cached.ts || 0)) >= SPLASH_POOL_TTL) {
-    tmdbFetch('/movie/popular?language=uk-UA&page=1')
-      .then(d => {
-        const items = (d.results || [])
-          .filter(x => x && x.poster_path && x.backdrop_path)
-          .map(x => ({ poster: x.poster_path, backdrop: x.backdrop_path }));
-        if (!items.length) return;
-        writeSplashPool(items);
-        if (!cached) {
-          const pick = items[Math.floor(Math.random() * items.length)];
-          applyPick(pick);
-        }
-      })
-      .catch(() => {});
-  }
-
-  setTimeout(() => {
-    splash.classList.add('hiding');
-    setTimeout(() => {
-      if (splash.isConnected) splash.remove();
-    }, 420);
-  }, SPLASH_DURATION_MS);
-}
-
-if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
-  initColdSplash();
-} else if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(e => console.warn('[SW]', e));
-  });
-}
 /* FIX-DEEPLINK */
 var _isReload = false;
 try {
@@ -263,75 +155,6 @@ if (!window.currentUser && Object.keys(lib).length === 0 && !localStorage.getIte
     }
   }, 800);
 }
-
-// ========== CAPACITOR BACK BUTTON (FIXED) ==========
-(function () {
-  const CapApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
-  if (!CapApp || !CapApp.addListener) {
-    console.warn('Capacitor App plugin not found. Back button handling disabled.');
-    return;
-  }
-  
-  function openExitConfirmModal() {
-    if (document.getElementById('exit-confirm-modal')) return;
-    const m = el('div', 'exit-confirm-overlay');
-    m.id = 'exit-confirm-modal';
-    const boxEl = el('div', 'exit-confirm-box');
-    boxEl.append(el('h3', '', 'Вийти з MyCinema?'));
-    const btns = el('div', 'exit-confirm-actions');
-    const cancel = el('button', 'exit-confirm-btn cancel', 'Скасувати');
-    cancel.type = 'button';
-    cancel.onclick = () => m.remove();
-    const confirmBtn = el('button', 'exit-confirm-btn confirm', 'Вийти');
-    confirmBtn.type = 'button';
-    confirmBtn.onclick = () => { m.remove(); CapApp.exitApp(); };
-    btns.append(cancel, confirmBtn);
-    boxEl.append(btns);
-    m.append(boxEl);
-    m.onclick = (e) => { if (e.target === m) m.remove(); };
-    document.body.appendChild(m);
-  }
-
-  CapApp.addListener('backButton', () => {
-    // 0. Діалог виходу, якщо вже відкритий
-    const exitDlg = document.getElementById('exit-confirm-modal');
-    if (exitDlg) { exitDlg.remove(); return; }
-
-    // 0.2. Плеєр / балансери (відео -> кроки назад -> закриття)
-    if (window.mcRoom && window.mcRoom.handleBack()) return;
-    if (typeof window.handleStreamsBack === 'function' && window.handleStreamsBack()) return;
-
-    // 0.2. Поверхневі модалки картки та обсерваторії
-    const topOverlay = document.querySelector('.reaction-modal-overlay, .quick-note-overlay, .tags-modal-overlay, .share-modal-overlay');
-    if (topOverlay) { topOverlay.remove(); return; }
-
-    // 1. Модальні вікна та оверлеї
-    if (document.getElementById('poster-zoom').classList.contains('open')) { closeImageZoom(); return; }
-    if (typeof handleSettingsBack === 'function' && handleSettingsBack()) return;
-    if (document.getElementById('auth-modal').style.display === 'flex') { closeAuthModal(); return; }
-
-    // 2. Бокове меню
-    if (document.getElementById('sidebar').classList.contains('open')) { closeSidebar(); return; }
-
-    // 3. Автокомпліт та дропдаун фільтрів
-    if (typeof filterDropdown !== 'undefined' && filterDropdown && !filterDropdown.classList.contains('hidden')) { hideFilterDropdown(); return; }
-    if (document.querySelector('.nav-group.open')) { closeNavDropdowns(); return; }
-    if (!autocomplete.classList.contains('hidden') && autocomplete.childElementCount) { hideAutocomplete(); return; }
-
-    // 4. Стек карток (модалка тайтлу/актора) з fallback
-    if (cardStack.length) {
-      if (typeof popTopCardFromBack === 'function') popTopCardFromBack();
-      else history.back();
-      return;
-    }
-
-    // 5. Таби (якщо не на головній)
-    if (state.tab !== 'home') { setTab('home'); return; }
-
-    // 6. Підтвердження виходу з додатку (тільки з головної)
-    openExitConfirmModal();
-  });
-})();
 
 // Ініціалізація видимості пошуку
 document.body.classList.toggle('no-search', !(state.tab === 'home' || state.tab === 'filter'));
@@ -505,13 +328,6 @@ function openAccountMenu(evt) {
 
   menu.appendChild(mkItem('Вийти', '', function() {
     if (typeof logoutUser === 'function') logoutUser();
-  }));
-  menu.appendChild(mkItem('Пройти онбординг знову', '', function() {
-    if (typeof closeSidebar === 'function') closeSidebar();
-    if (confirm('Пройти налаштування знову? Обрані тайтли додадуться з оцінкою 8.')) {
-      try { localStorage.removeItem('onboardingDone'); } catch (e) {}
-      if (typeof startOnboarding === 'function') startOnboarding();
-    }
   }));
   menu.appendChild(mkItem('Видалити акаунт', 'danger', function() {
     deleteAccount();

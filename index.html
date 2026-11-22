@@ -2,10 +2,11 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#08070a">
-<title>MyCinema · Cinema Observatory</title>
-<link rel="manifest" href="manifest.json">
+<title>MyCinema WEB · Cinema Observatory</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Geist:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -17,8 +18,18 @@
     <div class="sidebar-logo" title="Головна" onclick="setTab('home')">MyCinema</div>
     <div class="sidebar-email" id="sidebar-email">Гість</div>
   </div>
+  <div class="nav-center">
+    <div class="search-island"><button type="button" class="desktop-search-toggle icon-compact-btn" id="desktop-search-toggle" title="Пошук" aria-label="Пошук" onclick="toggleDesktopSearch()">
+      <span class="icon-btn-inner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.35-4.35"/></svg>
+      </span>
+    </button></div>
   <div class="sidebar-nav" id="sidebar-nav">
-    <div class="nav-item nav-top-item active" data-tab="home" onclick="setTab('home')"><span class="nav-icon">🏠</span> <span>Головна</span></div>
+    <div class="nav-item nav-top-item active" data-hometype="movie" onclick="setHomeType('movie')"><span class="nav-icon">🎬</span> <span>Фільми</span></div>
+
+    <div class="nav-item nav-top-item" data-hometype="tv" onclick="setHomeType('tv')"><span class="nav-icon">📺</span> <span>Серіали</span></div>
+
+    <div class="nav-item nav-top-item" data-tab="streamings" onclick="setTab('streamings')"><span class="nav-icon">📺</span> <span>Стрімінги</span></div>
 
     <div class="nav-group nav-top-item" data-group="lists">
       <button type="button" class="nav-group-btn" onclick="toggleNavGroup('lists', event)">
@@ -33,8 +44,6 @@
       </div>
     </div>
 
-    <div class="nav-item nav-top-item" data-tab="notes" onclick="setTab('notes')"><span class="nav-icon">📝</span> <span>Нотатки</span></div>
-
     <div class="nav-item nav-top-item" data-tab="calendar" onclick="setTab('calendar')"><span class="nav-icon">📅</span> <span>Календар</span></div>
 
     <div class="nav-item nav-top-item nav-item-accent" data-tab="statistics" onclick="setTab('statistics')"><span class="nav-icon">📊</span> <span>Обсерваторія</span></div>
@@ -48,40 +57,49 @@
       <div class="nav-dropdown nav-more-menu" id="nav-more-menu"></div>
     </div>
   </div>
+  </div>
   <div class="sidebar-footer">
-    <button type="button" class="taste-top-btn" id="taste-top-btn" title="Твій смак · Обсерваторія" onclick="toggleObservatory()">
-      <span class="taste-top-avatar" id="taste-top-avatar"></span>
-      <span class="taste-top-value" id="taste-top-value">—</span>
-    </button>
-    <button type="button" class="desktop-search-toggle icon-compact-btn" id="desktop-search-toggle" title="Пошук" aria-label="Пошук" onclick="toggleDesktopSearch()">
-      <span class="icon-btn-inner">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.35-4.35"/></svg>
-      </span>
-    </button>
-    <button class="login-btn-side icon-compact-btn" id="sidebar-login-btn" title="Увійти в акаунт" onclick="openAuthModal()">
+    <div class="utility-dock">
+      <button class="login-btn-side icon-compact-btn" id="sidebar-login-btn" title="Увійти в акаунт" onclick="openAuthModal()">
       <span class="icon-btn-inner">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span class="btn-label">Увійти в акаунт</span>
       </span>
     </button>
-    <button class="logout-btn-side icon-compact-btn" id="sidebar-top-btn" title="Мій топ" onclick="setTab('top')">
-      <span class="icon-btn-inner">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
-      </span>
-    </button>
-    <button class="logout-btn-side icon-compact-btn logged-in" id="sidebar-logout-btn" style="display:none;" title="Акаунт" onclick="openAccountMenu(event)">
+      <button class="logout-btn-side icon-compact-btn logged-in" id="sidebar-logout-btn" style="display:none;" title="Акаунт" onclick="openAccountMenu(event)">
       <span class="icon-btn-inner">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span class="account-dot" aria-hidden="true"></span>
         <span class="btn-label">Акаунт</span>
       </span>
     </button>
-    <button class="logout-btn-side icon-compact-btn settings-compact-btn" id="sidebar-settings-btn" title="Налаштування" onclick="openSettings()">
+      <button class="logout-btn-side icon-compact-btn settings-compact-btn" id="sidebar-settings-btn" title="Налаштування" onclick="setTab('settings')">
       <span class="icon-btn-inner">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span class="btn-label">Налаштування</span>
       </span>
     </button>
+    </div>
+
+    <button type="button" class="taste-top-btn mood-chip" id="taste-top-btn" title="Твій смак · Обсерваторія" onclick="toggleObservatory()">
+      <span class="taste-top-avatar mood-chip-avatar" id="taste-top-avatar"></span>
+      <span class="mood-chip-meta">
+        <span class="mood-chip-label" id="taste-top-label">НА ОРБІТІ</span>
+        <span class="mood-chip-score"><span class="taste-top-value mood-chip-value" id="taste-top-value">—</span><span class="mood-chip-delta" id="taste-top-delta">▲ +0.0</span></span>
+      </span>
+    </button>
+    <div class="top-island"><button class="logout-btn-side icon-compact-btn" id="sidebar-top-btn" title="Мій топ" onclick="setTab('top')">
+      <span class="icon-btn-inner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+      </span>
+    </button></div>
+    <div class="refresh-slot" id="refresh-slot" style="display:none;"><button type="button" class="logout-btn-side icon-compact-btn" id="sidebar-refresh-btn" title="Оновити рекомендації" aria-label="Оновити рекомендації" onclick="refreshHomeRecs()">
+      <span class="icon-btn-inner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        <span class="btn-label">Оновити</span>
+      </span>
+    </button></div>
+  </div>
   </div>
 </div>
 
@@ -164,11 +182,6 @@
         <input type="checkbox" id="poster-bg-toggle" onchange="onPosterBgToggle(this.checked)">
         <span>Постер як фон на картці тайтлу</span>
       </label>
-      <label class="settings-toggle">
-        <input type="checkbox" id="title-logo-toggle" onchange="onTitleLogoToggle(this.checked)">
-        <span>Логотип замість назви (українською)</span>
-      </label>
-      <div class="notes-hint">Якщо українського логотипа немає — лишається звичайна назва.</div>
     </div>
   </div>
 </div>
@@ -186,10 +199,6 @@
       <label class="settings-toggle">
         <input type="checkbox" id="streams-enable-toggle">
         <span>Дивитись на UAKINO</span>
-      </label>
-      <label class="settings-toggle">
-        <input type="checkbox" id="network-enable-toggle">
-        <span>Дивитись по мережі</span>
       </label>
     </div>
 
@@ -251,7 +260,6 @@
       <div class="settings-section-title">Бібліотека та синхронізація</div>
       <button class="settings-btn" onclick="exportLibrary()">Експорт бібліотеки</button>
       <button class="settings-btn" onclick="importLibrary()">Імпорт бібліотеки</button>
-      <button class="settings-btn" onclick="syncFromSettings()">Синхронізувати з хмарою</button>
     </div>
   </div>
 </div>
@@ -310,25 +318,6 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 window.supabase = supabase;
 window._isExplicitLogout = false;
 
-// Миттєве відновлення кешованого користувача до запиту по мережі
-try {
-  const _cached = JSON.parse(localStorage.getItem('mycinema.auth.user') || 'null');
-  if (_cached && _cached.uid) {
-    window.currentUser = _cached;
-    window.firebaseReady = true;
-    const _em = document.getElementById('sidebar-email');
-    if (_em) _em.textContent = _cached.email || 'Користувач';
-    const _lb = document.getElementById('sidebar-login-btn');
-    if (_lb) _lb.style.display = 'none';
-    const _ob = document.getElementById('sidebar-logout-btn');
-    if (_ob) _ob.style.display = 'block';
-    const _ab = document.getElementById('auth-banner');
-    if (_ab) _ab.classList.remove('visible');
-    /* Повідомляємо застосунок, що користувач відновлений із кешу —
-       інакше початкової синхронізації не відбувається. */
-    window.dispatchEvent(new CustomEvent('firebase-ready'));
-  }
-} catch (e) {}
 window.supabase = supabase;
 
 
@@ -484,9 +473,8 @@ window.openAuthModal = () => {
   /* FIX-AUTH-NATIVE-FORGOT */
   document.getElementById('auth-modal').style.display = 'flex';
   if (typeof window.switchAuthMode === 'function') window.switchAuthMode('login');
-  var _isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   var _fBtn = document.getElementById('btn-forgot');
-  if (_fBtn) _fBtn.style.display = _isNative ? 'none' : 'block';
+  if (_fBtn) _fBtn.style.display = 'block';
 };
 
 window.closeAuthModal = () => { document.getElementById('auth-modal').style.display = 'none'; };
@@ -523,18 +511,12 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     document.getElementById('sidebar-login-btn').style.display = 'block';
     document.getElementById('sidebar-logout-btn').style.display = 'none';
   } else {
-    // Мережевий збій або оновлення додатку — тримаємо локальну сесію
-    try {
-      const _cached = JSON.parse(localStorage.getItem('mycinema.auth.user') || 'null');
-      if (_cached && _cached.uid) {
-        window.currentUser = _cached;
-        window.firebaseReady = false;
-        document.getElementById('sidebar-email').textContent = _cached.email || 'Користувач';
-        document.getElementById('sidebar-login-btn').style.display = 'none';
-        document.getElementById('sidebar-logout-btn').style.display = 'block';
-        document.getElementById('auth-banner').classList.remove('visible');
-      }
-    } catch (e) {}
+    window.currentUser = null;
+    window.firebaseReady = false;
+    document.getElementById('auth-banner').classList.add('visible');
+    document.getElementById('sidebar-email').textContent = 'Гість';
+    document.getElementById('sidebar-login-btn').style.display = 'block';
+    document.getElementById('sidebar-logout-btn').style.display = 'none';
   }
 });
 </script>

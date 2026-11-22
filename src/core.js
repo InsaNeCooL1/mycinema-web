@@ -5,7 +5,7 @@ const _idbMem = new Map();
 const _IDB_NAME = 'mycinema_cache_db';
 const _IDB_STORE = 'kv';
 const _IDB_KEYS = [
-  typeof RECS_CACHE !== 'undefined' ? RECS_CACHE : 'mycinema.recs.v5',
+  typeof RECS_CACHE !== 'undefined' ? RECS_CACHE : 'mycinema.recs.v7',
   'mycinema.home.general.v7',
   'mycinema.metaCache.v2',
   'mycinema.colCache.v1',
@@ -177,7 +177,7 @@ let lib = load();
 let _dirtyItems = new Set();
 let _saveTimer = null;
 let actorAdjust = (() => { try { return JSON.parse(localStorage.getItem(ACTOR_ADJUST_KEY)) || {}; } catch { return {}; } })();
-const VALID_TABS = new Set(['home', 'watching', 'watched', 'planned', 'dropped', 'favorites', 'notes', 'top', 'calendar', 'statistics', 'game']);
+const VALID_TABS = new Set(['streamings', 'settings', 'home', 'watching', 'watched', 'planned', 'dropped', 'favorites', 'notes', 'top', 'calendar', 'statistics', 'game']);
 let _savedTab = 'home';
 try {
   const t = localStorage.getItem('mycinema.activeTab');
@@ -1486,7 +1486,7 @@ function setKbdNavEnabled(on) {
   }, { passive: true });
 
   document.addEventListener('keydown', (e) => {
-    if (!isKbdNavEnabled()) return;
+    if (!isKbdNavEnabled() || !e || typeof e.key !== 'string') return;
     if (e.key === 'Tab' || e.key.startsWith('Arrow')) {
       document.documentElement.classList.add('mc-kbd');
       activate();
