@@ -1,7 +1,7 @@
 /* MyCinema WEB — Service Worker (PWA app shell) */
 'use strict';
 
-const CACHE = 'mycinema-web-v1';
+const CACHE = 'mycinema-web-v3';
 const SHELL = [
   './',
   './index.html',
@@ -51,7 +51,22 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Статика: cache-first + фонове оновлення
+  // Код/стилі: network-first (свіжі фікси), офлайн — з кешу
+  const isCode = /\/bundle\.js|\/styles\.css|\/sw\.js/.test(url.pathname);
+  if (isCode) {
+    e.respondWith(
+      fetch(req).then((res) => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+        }
+        return res;
+      }).catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Решта статика: cache-first + фонове оновлення
   e.respondWith(
     caches.match(req).then((cached) => {
       const network = fetch(req).then((res) => {

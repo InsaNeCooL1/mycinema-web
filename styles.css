@@ -5558,6 +5558,9 @@ body:has(.home-hero) { padding-top: 0 !important; }
     box-shadow: 0 6px 22px rgba(var(--accent-rgb), .35);
   }
   .mobile-hero .mob-hero-floats .mob-trailer:active { background: var(--accent-hover); transform: scale(.97); }
+  /* В оригінального .btn-play/.btn-stop ховаємо дубль */
+  .mobile-hero .btn-play.mob-trailer-hidden,
+  .mobile-hero .btn-stop.mob-trailer-hidden { display: none !important; }
 
   /* 2) Заголовок/метадані/рейтинги */
   .card-desktop-root .mobile-title,
@@ -5577,11 +5580,17 @@ body:has(.home-hero) { padding-top: 0 !important; }
   /* 3) Кнопки дій: головна — повна ширина, другий рядок — статус + нотатки */
   .card-desktop-root .mobile-actions { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 12px; padding-bottom: 6px; }
   .card-desktop-root .mobile-actions .btn-watch-primary { flex: 1 1 100%; width: 100%; min-height: 48px; }
-  .card-desktop-root .mobile-actions .btn-watched { display: none; }
+  .card-desktop-root .mobile-actions .btn-watched { display: none !important; }
   .card-desktop-root .mobile-actions .status-select { flex: 1 1 56%; min-width: 0; }
   .card-desktop-root .mobile-actions .status-select-btn { width: 100%; min-height: 44px; }
   .card-desktop-root .mobile-actions .btn-notes-icon { flex: 0 0 48px; min-height: 44px; }
-  .card-desktop-root .mobile-actions .mob-statuses-btn { display: none; }
+  .card-desktop-root .mobile-actions .mob-statuses-btn,
+  .card-desktop-root .mobile-actions .mob-status-open { display: flex; }
+  .card-desktop-root .mobile-actions .mob-status-open {
+    flex: 1 1 46%; min-height: 44px; border-radius: 12px;
+    background: rgba(255,255,255,.07); border: 1px solid rgba(var(--accent-rgb), .28);
+    color: var(--text); font-size: 14px; font-weight: 700;
+  }
 
   /* 4) Моя оцінка: згорнута панель клікабельна, розгорнута — 2 рядки на критерій */
   .card-desktop-root .mobile-score {

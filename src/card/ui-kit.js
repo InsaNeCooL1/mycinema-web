@@ -622,6 +622,14 @@
       t.append(el('span', 'score-total-label', 'Сезон ' + sel));
       t.append(el('span', 'score-total-val' + (avg > 0 ? ' ' + tempCls(avg * 10) : ''), avg > 0 ? fmtNum(avg) : '—'));
       body.append(t);
+
+      // Оновлюємо загальну оцінку (вона рахується зі всіх сезонів)
+      const totalRating = computeItemRating(cur);
+      const gv = wrap.querySelector('.tv-general-total .score-total-val');
+      if (gv) {
+        gv.className = 'score-total-val' + (totalRating.avg > 0 ? ' ' + tempCls(totalRating.avg * 10) : '');
+        gv.textContent = totalRating.avg > 0 ? fmtNum(totalRating.avg) : '—';
+      }
     };
 
     paint();

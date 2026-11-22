@@ -331,6 +331,8 @@
         t.type = 'button';
         t.onclick = tbtn.onClick || tbtn.onclick;
         floats.append(t);
+        /* Оригінальну кнопку ховаємо — інакше на постері два трейлери */
+        tbtn.classList.add('mob-trailer-hidden');
       }
       /* Сердечко — вгорі праворуч, нижче топ-бару */
       const fav = card.querySelector('.hero-fav-btn');
@@ -341,8 +343,13 @@
       const selBtn = card.querySelector('.status-select .status-select-btn');
       if (selBtn && !selBtn.dataset.mobSheet) {
         selBtn.dataset.mobSheet = '1';
-        selBtn.onclick = (e) => { e.stopPropagation(); openMobStatusSheet(cardStack[cardStack.length - 1]); };
+        selBtn.onclick = null; /* прибираємо десктопний dropdown */
+        selBtn.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          openMobStatusSheet(cardStack[cardStack.length - 1]);
+        });
       }
+      /* Явна кнопка «Статуси» додається через observer нижче (після всіх ререндерів) */
       /* Згорнута «Моя оцінка» — клікабельна вся панель */
       const score = card.querySelector('.mobile-score');
       if (score && !score.dataset.mobToggle) {
@@ -364,8 +371,23 @@
       const st = card.querySelector('.mobile-statuses');
       if (st) st.remove();
     };
+    /* Гарантуємо наявність/status-кнопки після будь-якого перемалювання actions */
+    const ensureStatusButton = () => {
+      const actions = card.querySelector('.mobile-actions');
+      if (!actions || actions.querySelector('.mob-status-open')) return;
+      const sb = el('button', 'mob-status-open', 'Статуси ▾');
+      sb.type = 'button';
+      sb.onclick = () => openMobStatusSheet(cardStack[cardStack.length - 1]);
+      actions.append(sb);
+    };
+    try {
+      new MutationObserver(ensureStatusButton).observe(card, { childList: true, subtree: true });
+    } catch (e) {}
+
     const _rc = window.renderCard;
-    window.renderCard = function (restore) { const r = _rc(restore); attach(); syncMobTop(); return r; };
+    window.renderCard = function (restore) { const r = _rc(restore); attach(); ensureStatusButton(); syncMobTop(); return r; };
+    /* Перший виклик — на випадок, якщо картка вже відкрита */
+    ensureStatusButton();
     const _oc = window.openCard;
     window.openCard = function (item) { const r = _oc(item); attach(); syncMobTop(); return r; };
     const _cc = window.closeCard;
