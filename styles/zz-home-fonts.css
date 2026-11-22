@@ -282,11 +282,6 @@
 #results /* FIX-MISSING-UI-CSS-V1 */
 .label { font-size: calc(1.1 * 12px); }
 #results .episode-card.watched .episode-poster-wrap::after { font-size: calc(1.1 * 12px); }
-#results .fact-card-badge { font-size: calc(1.1 * 11px); }
-#results .fact-card-close { font-size: calc(1.1 * 12px); }
-#results .fact-card-text { font-size: calc(1.1 * 13.5px); }
-#results .fact-card-link { font-size: calc(1.1 * 12.5px); }
-#results .fact-modal .fact-card-text { font-size: calc(1.1 * 14px); }
 #results .company-logo-box.empty { font-size: calc(1.1 * 36px); }
 #results .company-parent-chip { font-size: calc(1.1 * 12px); }
 #results .company-desc { font-size: calc(1.1 * 13.5px); }

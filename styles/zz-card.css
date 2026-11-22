@@ -327,7 +327,6 @@
 .rating-imdb .rate-imdb { color: #f5c518; }
 .rating-rt .rate-rt { color: #ff8066; }
 .rating-mc .rate-mc { color: #9de5c3; }
-body:has(#overlay.open) .fact-card { display: none; }
 .actor-strip-wrap .recs-strip-arrow { top: 26%; }
 .actor-strip-wrap .recs-strip-prev { left: -6px; }
 .actor-strip-wrap .recs-strip-next { right: -6px; }

@@ -1629,7 +1629,6 @@ function renderHomeSkeleton(taste) {
   updateTopTasteButton(taste);
 
   const wrap = el('div', 'home-wrap');
-  buildFactOfDayCard();
   const sec = el('section', 'home-section');
   const head = el('div', 'section-head');
   head.append(el('h2', 'section-title', '✨ Для тебе'));
@@ -2518,7 +2517,6 @@ function renderHomeContent(taste) {
   const wrap = el('div', 'home-wrap');
 
   if (state.home.view === 'my') {
-    buildFactOfDayCard();
     const recs = state.home.recs;
 
     if (recs && recs.seeds > 0) {
@@ -2532,44 +2530,6 @@ function renderHomeContent(taste) {
   }
 
   box.append(wrap);
-}
-
-function buildFactOfDayCard() {
-  if (typeof getFactOfDay !== 'function' || typeof isFactDismissedToday !== 'function') return;
-  if (isFactDismissedToday()) return;
-  if (document.querySelector('.fact-modal-overlay')) return;
-  const fact = getFactOfDay();
-  if (!fact) return;
-
-  const overlay = el('div', 'fact-modal-overlay');
-  const card = el('div', 'fact-modal');
-  const head = el('div', 'fact-card-head');
-  head.append(el('span', 'fact-card-badge', '🎞️ Факт дня'));
-
-  const closeBtn = el('button', 'fact-card-close', '✕');
-  closeBtn.type = 'button';
-  closeBtn.title = 'Сховати до завтра';
-  const close = () => {
-    dismissFactToday();
-    card.classList.add('dismissing');
-    setTimeout(() => overlay.remove(), 180);
-  };
-  closeBtn.addEventListener('click', close);
-  head.append(closeBtn);
-  card.append(head);
-
-  card.append(el('div', 'fact-card-text', fact.text));
-
-  if (fact.title && typeof openFactMedia === 'function') {
-    const linkBtn = el('button', 'fact-card-link', `🎬 ${fact.title}${fact.year ? ' (' + fact.year + ')' : ''} →`);
-    linkBtn.type = 'button';
-    linkBtn.addEventListener('click', () => { close(); openFactMedia(fact); });
-    card.append(linkBtn);
-  }
-
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-  overlay.append(card);
-  document.body.append(overlay);
 }
 
 const _nextEpSeasonCache = new Map();

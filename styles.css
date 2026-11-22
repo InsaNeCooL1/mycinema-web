@@ -3478,93 +3478,6 @@ html.mc-kbd .card-tab:focus-visible {
   box-shadow: 0 2px 8px rgba(0, 0, 0, .55);
 }
 
-.fact-card {
-  background: linear-gradient(135deg, rgba(var(--accent-rgb), .09), rgba(22, 20, 27, .92));
-  border: 1px solid rgba(var(--accent-rgb), .22);
-  border-radius: var(--r-md);
-  padding: 14px 16px;
-  margin-bottom: 22px;
-  transition: opacity .18s ease, transform .18s ease;
-}
-.fact-card.dismissing {
-  opacity: 0;
-  transform: scale(.97);
-}
-.fact-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.fact-card-badge {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: .8px;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-.fact-card-close {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-xs);
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  transition: .15s;
-}
-.fact-card-close:hover {
-  background: var(--bg-3);
-  color: var(--text);
-}
-.fact-card-text {
-  font-size: 13.5px;
-  line-height: 1.55;
-  color: var(--text-secondary);
-}
-.fact-card-link {
-  margin-top: 10px;
-  padding: 6px 12px;
-  border-radius: var(--r-xs);
-  background: rgba(var(--accent-rgb), .12);
-  border: 1px solid rgba(var(--accent-rgb), .28);
-  color: var(--accent);
-  font-size: 12.5px;
-  font-weight: 600;
-  transition: .15s;
-}
-.fact-card-link:hover {
-  background: var(--accent);
-  color: var(--accent-fg);
-}
-
-/* [LAYOUT] Факт дня — вільна плашка зверху праворуч, без затемнення екрану. */
-.fact-modal-overlay {
-  position: fixed;
-  top: 168px;
-  right: 22px;
-  z-index: 1500;
-}
-
-.fact-modal {
-  width: clamp(320px, 14.28vw, 560px);
-  height: clamp(220px, 25vh, 360px);
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  padding: 18px 20px;
-  background: linear-gradient(135deg, rgba(var(--accent-rgb), .09), rgba(22, 20, 27, .96));
-  border: 1px solid rgba(var(--accent-rgb), .28);
-  border-radius: var(--r-lg);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, .75);
-  animation: fadeUp .2s ease-out;
-  transition: opacity .18s ease, transform .18s ease;
-}
-.fact-modal.dismissing { opacity: 0; transform: scale(.96); }
-.fact-modal .fact-card-text { flex: 1; min-height: 0; overflow-y: auto; font-size: 14px; }
 
 
 /* FIX-COMPANY-AND-OBS-CSS */
@@ -4259,11 +4172,6 @@ html.mc-kbd .card-tab:focus-visible {
 #results /* FIX-MISSING-UI-CSS-V1 */
 .label { font-size: calc(1.1 * 12px); }
 #results .episode-card.watched .episode-poster-wrap::after { font-size: calc(1.1 * 12px); }
-#results .fact-card-badge { font-size: calc(1.1 * 11px); }
-#results .fact-card-close { font-size: calc(1.1 * 12px); }
-#results .fact-card-text { font-size: calc(1.1 * 13.5px); }
-#results .fact-card-link { font-size: calc(1.1 * 12.5px); }
-#results .fact-modal .fact-card-text { font-size: calc(1.1 * 14px); }
 #results .company-logo-box.empty { font-size: calc(1.1 * 36px); }
 #results .company-parent-chip { font-size: calc(1.1 * 12px); }
 #results .company-desc { font-size: calc(1.1 * 13.5px); }
@@ -4605,7 +4513,6 @@ html.mc-kbd .card-tab:focus-visible {
 .rating-imdb .rate-imdb { color: #f5c518; }
 .rating-rt .rate-rt { color: #ff8066; }
 .rating-mc .rate-mc { color: #9de5c3; }
-body:has(#overlay.open) .fact-card { display: none; }
 .actor-strip-wrap .recs-strip-arrow { top: 26%; }
 .actor-strip-wrap .recs-strip-prev { left: -6px; }
 .actor-strip-wrap .recs-strip-next { right: -6px; }
@@ -5204,7 +5111,7 @@ body:has(.home-hero) { padding-top: 0 !important; }
   .mob-sheet-watch.active { color: var(--mint); border-color: rgba(157, 229, 195, .45); background: rgba(157, 229, 195, .12); box-shadow: 0 0 10px rgba(157, 229, 195, .2); }
 
   /* ---- Боттом-шити (generic) ---- */
-  #mob-sheet-backdrop { position: fixed; inset: 0; z-index: 1100; display: none; }
+  #mob-sheet-backdrop { position: fixed; inset: 0; z-index: 1200; display: none; }
   #mob-sheet-backdrop.open { display: block; }
   .mob-sheet-panel {
     position: fixed; left: 0; right: 0; bottom: 0;
@@ -5219,7 +5126,7 @@ body:has(.home-hero) { padding-top: 0 !important; }
     transform: translateY(100%);
     transition: transform .34s cubic-bezier(.22, 1, .36, 1);
   }
-  #mob-sheet-backdrop.open .mob-sheet-panel { transform: none; }
+  #mob-sheet-backdrop.open .mob-sheet-panel { transform: translateY(0); }
   .mob-sheet-handle {
     width: 36px; height: 5px; margin: 4px auto 10px; border-radius: 3px;
     background: rgba(255, 255, 255, .18); cursor: grab;

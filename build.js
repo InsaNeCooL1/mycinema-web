@@ -12,7 +12,6 @@ const SRC_FILES = [
   'src/ui.js',
   'src/player-overlay.js',
   'src/player-controls.js',
-  'src/facts.js',
   'src/search.js',
   'src/recs-math.js',
   'src/rails.js',

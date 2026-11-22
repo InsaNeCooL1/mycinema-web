@@ -114,11 +114,9 @@
     // Історія: системний «Назад» закриває шит
     try { history.pushState({ mcSheet: 1 }, '', location.href); } catch (e) {}
 
-    SHEET_BD.addEventListener('click', (e) => {
-      if (e.target === SHEET_BD) mobSheetClose();
-    }, { once: true });
+    // Клік по бекдропу обробляється одним постійним слухачем (див. init),
+    // тут лише скид стану свайпу
 
-    // Swipe-to-close: ліснери реєструються ОДНОРАЗОВО (див. init), тут лише скид стану
     SHEET_PANEL._y0 = 0;
     SHEET_PANEL._dy = 0;
     SHEET_PANEL._swiping = false;
@@ -138,6 +136,14 @@
   function initSheetSwipe() {
     if (!SHEET_PANEL || SHEET_PANEL._swipeInit) return;
     SHEET_PANEL._swipeInit = true;
+    /* Один постійний слухач бекдропу: закриває лише клік саме по фону */
+    if (SHEET_BD) {
+      SHEET_BD.addEventListener('click', (e) => {
+        if (e.target !== SHEET_BD) return;
+        if (!SHEET_BD.classList.contains('open')) return;
+        mobSheetClose();
+      });
+    }
     SHEET_PANEL.addEventListener('pointerdown', (e) => {
       if (!SHEET_BD.classList.contains('open')) return;
       if (e.target.closest('button, a, input, select, textarea')) return;
@@ -418,6 +424,8 @@
 
   /* ---------- Системний «Назад»: завжди знімаємо оверлеї/скрол-лок ---------- */
   function closeAllOverlays() {
+    // НЕ закриваємо картку — вона є частиною роутингу через hash,
+    // інакше deep-link/переходи закривають щойно відкритий тайтл
     if (SEARCH_PAGE && SEARCH_PAGE.classList.contains('open')) closeMobSearch();
     if (SHEET_BD && SHEET_BD.classList.contains('open')) mobSheetClose();
     lockPageScroll(false);
