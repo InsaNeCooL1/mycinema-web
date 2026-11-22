@@ -488,13 +488,9 @@
   .card-desktop-root .mobile-actions .status-select { flex: 1 1 56%; min-width: 0; }
   .card-desktop-root .mobile-actions .status-select-btn { width: 100%; min-height: 44px; }
   .card-desktop-root .mobile-actions .btn-notes-icon { flex: 0 0 48px; min-height: 44px; }
-  .card-desktop-root .mobile-actions .mob-statuses-btn,
-  .card-desktop-root .mobile-actions .mob-status-open { display: flex; }
-  .card-desktop-root .mobile-actions .mob-status-open {
-    flex: 1 1 46%; min-height: 44px; border-radius: 12px;
-    background: rgba(255,255,255,.07); border: 1px solid rgba(var(--accent-rgb), .28);
-    color: var(--text); font-size: 14px; font-weight: 700;
-  }
+  .card-desktop-root .mobile-actions .mob-statuses-btn { display: flex; }
+  /* Десктопний dropdown статусів на мобільному не показуємо — є Bottom Sheet */
+  .card-desktop-root .status-menu { display: none !important; }
 
   /* 4) Моя оцінка: згорнута панель клікабельна, розгорнута — 2 рядки на критерій */
   .card-desktop-root .mobile-score {

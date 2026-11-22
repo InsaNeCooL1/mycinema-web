@@ -339,17 +339,8 @@
       if (fav) floats.append(fav);
       hero.append(floats);
 
-      /* Статус/джерело перегляду на мобільному — Bottom Sheet */
-      const selBtn = card.querySelector('.status-select .status-select-btn');
-      if (selBtn && !selBtn.dataset.mobSheet) {
-        selBtn.dataset.mobSheet = '1';
-        selBtn.onclick = null; /* прибираємо десктопний dropdown */
-        selBtn.addEventListener('click', (e) => {
-          e.preventDefault(); e.stopPropagation();
-          openMobStatusSheet(cardStack[cardStack.length - 1]);
-        });
-      }
-      /* Явна кнопка «Статуси» додається через observer нижче (після всіх ререндерів) */
+      /* Статус-шит відкривається через делегований обробник (див. нижче).
+         Тут нічого не додаємо — зайвий рядок кнопок не потрібен. */
       /* Згорнута «Моя оцінка» — клікабельна вся панель */
       const score = card.querySelector('.mobile-score');
       if (score && !score.dataset.mobToggle) {
@@ -371,23 +362,8 @@
       const st = card.querySelector('.mobile-statuses');
       if (st) st.remove();
     };
-    /* Гарантуємо наявність/status-кнопки після будь-якого перемалювання actions */
-    const ensureStatusButton = () => {
-      const actions = card.querySelector('.mobile-actions');
-      if (!actions || actions.querySelector('.mob-status-open')) return;
-      const sb = el('button', 'mob-status-open', 'Статуси ▾');
-      sb.type = 'button';
-      sb.onclick = () => openMobStatusSheet(cardStack[cardStack.length - 1]);
-      actions.append(sb);
-    };
-    try {
-      new MutationObserver(ensureStatusButton).observe(card, { childList: true, subtree: true });
-    } catch (e) {}
-
     const _rc = window.renderCard;
-    window.renderCard = function (restore) { const r = _rc(restore); attach(); ensureStatusButton(); syncMobTop(); return r; };
-    /* Перший виклик — на випадок, якщо картка вже відкрита */
-    ensureStatusButton();
+    window.renderCard = function (restore) { const r = _rc(restore); attach(); syncMobTop(); return r; };
     const _oc = window.openCard;
     window.openCard = function (item) { const r = _oc(item); attach(); syncMobTop(); return r; };
     const _cc = window.closeCard;
@@ -400,6 +376,17 @@
     attach();
     syncMobTop();
   }
+
+  /* ---------- Статус-селектор картки → Bottom Sheet (делегований) ---------- */
+  document.addEventListener('click', (e) => {
+    if (!isMobShell()) return;
+    const btn = e.target instanceof Element ? e.target.closest('.status-select-btn') : null;
+    if (!btn || !document.getElementById('card').contains(btn)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const ctx = cardStack[cardStack.length - 1];
+    if (ctx) openMobStatusSheet(ctx);
+  }, true);
 
   /* ---------- Library filters → filters sheet (mobile) ---------- */
   document.addEventListener('click', (e) => {
