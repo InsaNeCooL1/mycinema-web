@@ -23,5 +23,13 @@ worker/index.js
 MyCinemaBKP/
 MyCinemaBKP.tar.gz
 
+# Capacitor / Android build artifacts
+www/
+android/.gradle/
+android/app/build/
+android/local.properties
+android/captures/
+android/app/src/main/assets/public/
+
 # Generated datasets cache (large IMDb TSV / search cache)
 tools/.cache/
