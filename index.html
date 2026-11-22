@@ -2,6 +2,7 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MyCinema WEB · Cinema Observatory</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -101,6 +102,33 @@
     </button></div>
   </div>
   </div>
+</div>
+
+<!-- ── Мобільна оболонка: топ-бар + нижній Tab Bar + Боттом-шити < 768px ── -->
+<div id="mob-topbar">
+  <div id="mob-topbar-left">
+    <button type="button" class="mob-top-logo" id="mob-top-logo">MyCinema</button>
+  </div>
+  <div id="mob-topbar-right">
+    <button type="button" class="mob-top-icon" id="mob-top-search" title="Пошук">🔍</button>
+  </div>
+</div>
+<div id="mob-bottom">
+  <button type="button" class="mob-nav-btn" id="mob-nav-movies" data-nav="movies">🎬<span class="mob-nav-label">Фільми</span></button>
+  <button type="button" class="mob-nav-btn" id="mob-nav-tv" data-nav="tv">📺<span class="mob-nav-label">Серіали</span></button>
+  <button type="button" class="mob-nav-btn" id="mob-nav-streamings" data-nav="streamings">📺<span class="mob-nav-label">Стрімінги</span></button>
+  <button type="button" class="mob-nav-btn" id="mob-nav-lists" data-nav="lists">📚<span class="mob-nav-label">Списки</span></button>
+  <button type="button" class="mob-nav-btn" id="mob-nav-more" data-nav="more">⋯<span class="mob-nav-label">Ще</span></button>
+</div>
+<div id="mob-sheet-backdrop" class="mob-sheet-backdrop">
+  <div class="mob-sheet-panel" id="mob-sheet-panel"></div>
+</div>
+<div id="mob-search-page">
+  <button type="button" class="mob-search-back" id="mob-search-back">← Назад</button>
+  <button type="button" class="mob-search-close" id="mob-search-close">✕</button>
+  <input type="search" id="mob-search-input" placeholder="Пошук..." aria-label="Пошук" autocomplete="off">
+  <div id="mob-search-history"></div>
+  <div id="mob-search-results"></div>
 </div>
 
 <header>

@@ -156,6 +156,7 @@ async function openCompany(companyId) {
       window.STREAM_COMPANY_MAP[companyId] && typeof openStreamingProfile === 'function') {
     return openStreamingProfile(window.STREAM_COMPANY_MAP[companyId]);
   }
+  if (typeof _mcSavePageScroll === 'function' && !cardStack.length) _mcSavePageScroll();
   overlay.classList.add('open');
   const top = cardStack[cardStack.length - 1];
   if (top && top.type === 'company' && top.id === companyId) return;

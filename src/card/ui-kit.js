@@ -351,6 +351,7 @@
     const notesIcon = el('button', 'btn-notes-icon', '📝');
     notesIcon.type = 'button';
     notesIcon.title = 'Нотатки';
+    notesIcon.setAttribute('aria-label', 'Нотатки');
     notesIcon.onclick = () => { if (typeof window.openQuickNoteModal === 'function') window.openQuickNoteModal(ctx); };
     wrap.append(notesIcon);
 

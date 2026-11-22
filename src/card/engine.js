@@ -104,9 +104,22 @@ function refreshCardControlsInPlace(ctx) {
   }
 }
 
+let _mcPageScrollBeforeCard = null;
+function _mcSavePageScroll() {
+  if (_mcPageScrollBeforeCard === null) _mcPageScrollBeforeCard = window.scrollY || 0;
+  window.scrollTo(0, 0); /* нова картка завжди з початку */
+}
+function _mcRestorePageScroll() {
+  if (_mcPageScrollBeforeCard === null) return;
+  const y = _mcPageScrollBeforeCard;
+  _mcPageScrollBeforeCard = null;
+  window.scrollTo(0, y);
+}
+
 async function openCard(r) {
   if (cardStack.length) return openMediaFromStack(r);
   _libDirtySinceCardOpen = false;
+  _mcSavePageScroll();
   overlay.classList.add("open");
   const ctx = makeMediaCtx(r);
   cardStack = [ctx];
@@ -307,7 +320,8 @@ function closeCard() {
   if (iframe) iframe.src = 'about:blank';
 
   if (cardStack.length) history.go(-cardStack.length);
-  else { overlay.classList.remove('open'); refresh(); }
+  else { overlay.classList.remove('open'); refresh(); _mcRestorePageScroll(); }
+  if (typeof syncMobTop === 'function') syncMobTop();
 }
 
 /* [LAYOUT] Клік по затемненню поза карткою закриває її. */
@@ -354,6 +368,7 @@ window.addEventListener('popstate', async (e) => {
     /* FIX-POPSTATE-FLUSH */
     var _didFlush = (typeof _flushPendingSetTab === 'function') ? _flushPendingSetTab() : false;
     if (!_didFlush) refresh();
+    _mcRestorePageScroll();
   }
   else renderCard(true);
 });

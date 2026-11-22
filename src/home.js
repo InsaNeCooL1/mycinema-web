@@ -1919,7 +1919,11 @@ function renderHomeHero(hero) {
     showSyncToast('📅 Додано у «Планую»');
   };
   slides.forEach((_, i) => {
-    dots.append(el('span', 'hero-dot' + (i ? '' : ' active')));
+    const dot = el('button', 'hero-dot' + (i ? '' : ' active'));
+    dot.type = 'button';
+    dot.title = `Слайд ${i + 1}`;
+    dot.onclick = () => { if (idx % slides.length !== i) go(i - (idx % slides.length)); };
+    dots.append(dot);
   });
   paint();
   const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1934,6 +1938,27 @@ function renderHomeHero(hero) {
   };
   arrowPrev.onclick = () => go(-1);
   arrowNext.onclick = () => go(1);
+
+  /* Touch: гортання слайдів свайпом (стрілки на мобільних сховані CSS) */
+  (function attachHeroSwipe() {
+    let x0 = 0, y0 = 0, t0 = 0, active = false;
+    sec.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button, a, .home-hero-dots, .hero-dot')) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      active = true; x0 = e.clientX; y0 = e.clientY; t0 = Date.now();
+    });
+    sec.addEventListener('pointerup', (e) => {
+      if (!active) return;
+      active = false;
+      const dx = e.clientX - x0, dy = e.clientY - y0;
+      if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+      if (Date.now() - t0 > 900) return; /* повільне перетягування — не свайп */
+      go(dx < 0 ? 1 : -1);
+      stop(); start();
+    });
+    sec.addEventListener('pointercancel', () => { active = false; });
+  })();
+
   if (slides.length > 1 && !reduce) {
     _heroVisibilityHandler = () => { if (document.hidden) stop(); else start(); };
     document.addEventListener('visibilitychange', _heroVisibilityHandler);
@@ -2329,7 +2354,9 @@ function renderHomeRails(recs, wrap) {
 
 /* ================= HOVER PREVIEW (1.5s) ================= */
 (function initHoverPreview() {
-  if (typeof matchMedia === 'function' && !matchMedia('(hover: hover)').matches) return;
+  // Лише справжній десктопний pointer: touch/coarse never triggers preview
+  if (typeof matchMedia === 'function' &&
+      (!matchMedia('(hover: hover)').matches || !matchMedia('(pointer: fine)').matches)) return;
   let timer = null, hideTimer = null, activeCard = null, preview = null;
 
   const hide = () => {
@@ -2451,6 +2478,9 @@ function renderHomeRails(recs, wrap) {
   };
 
   document.addEventListener('mouseover', (e) => {
+    // Синтетичні mouse-події після тапу на тач-пристрої не мають відкривати прев'ю
+    if (e.sourceCapabilities && e.sourceCapabilities.firesTouchDevices) return;
+    if (e.pointerType === 'touch') return;
     const el0 = e.target instanceof Element ? e.target : null;
     const card = el0 && el0.closest('.rail-strip .rec-card');
     if (!card || card === activeCard) return;
@@ -2469,6 +2499,9 @@ function renderHomeRails(recs, wrap) {
   });
   document.addEventListener('keydown', hide);
   window.addEventListener('scroll', hide, { passive: true });
+  document.addEventListener('pointerdown', (e) => {
+    if (e.pointerType && e.pointerType !== 'mouse') hide();
+  }, { passive: true });
 })();
 
 function renderHomeContent(taste) {

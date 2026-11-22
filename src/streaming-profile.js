@@ -96,6 +96,7 @@ async function openStreamingProfile(ref) {
   if (!hub || hub.id === 'all') return;
   const top = cardStack[cardStack.length - 1];
   if (top && top.type === 'streaming' && top.id === hubId) return;
+  if (typeof _mcSavePageScroll === 'function' && !cardStack.length) _mcSavePageScroll();
   overlay.classList.add('open');
   saveCardScroll();
   const ctx = makeStreamingCtx(hubId);

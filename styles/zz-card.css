@@ -138,7 +138,7 @@
 
 /* Моя оцінка — totaл зверху, тонкі смужки, без цеглин */
 .mobile-score { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; }
-.mobile-score .score-total { order: -1; display: flex; align-items: baseline; justify-content: space-between; }
+.mobile-score .score-total { order: -1; display: flex; align-items: baseline; justify-content: space-between; margin-top: 0; padding-top: 0; border-top: 0; }
 .mobile-score .score-total-label { font-size: 13.2px; color: rgba(255,255,255,.55); }
 .mobile-score .score-total-val { font-size: 30.8px; font-weight: 800; }
 .score-header { display: flex; align-items: center; justify-content: space-between; }
@@ -239,7 +239,7 @@
   cursor: pointer;
 }
 .status-select-btn:hover { background: rgba(255,255,255,.12); }
-.status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 7px; vertical-align: 1px; }
+.status-dot { display: none !important; }
 .status-caret { margin-left: 6px; opacity: .6; }
 .status-menu {
   position: absolute;
@@ -283,15 +283,30 @@
 }
 .season-tabs-bar::-webkit-scrollbar { display: none; }
 
-/* ---- Вікі/TMDB як segmented control ---- */
+/* ---- Вікі/TMDB — окремі пігулки ---- */
 .overview-src {
   display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 9px;
-  background: rgba(255,255,255,.05);
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  border-radius: 0;
+  background: none;
 }
-.overview-src button { border-radius: 7px !important; padding: 3px 9px !important; }
+.overview-src button {
+  border-radius: 999px !important;
+  padding: 7px 16px !important;
+  min-height: 32px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(255,255,255,.06) !important;
+  border: 1px solid rgba(255,255,255,.08) !important;
+  color: rgba(255,255,255,.65) !important;
+}
+.overview-src button.active {
+  background: rgba(var(--accent-rgb), .16) !important;
+  border-color: rgba(var(--accent-rgb), .45) !important;
+  color: var(--accent) !important;
+}
 
 /* ---- Логотип каналу: приглушено ---- */
 .tv-icon-badge-logo { opacity: .72; background: rgba(20,20,22,.55); backdrop-filter: blur(10px); }

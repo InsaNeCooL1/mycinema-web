@@ -15,6 +15,7 @@ function syncNavActive() {
   });
   const moreGroup = document.querySelector('.nav-more-group');
   if (moreGroup) moreGroup.classList.toggle('has-active', !!moreGroup.querySelector('.nav-item.active'));
+  if (typeof syncMobNavActive === 'function') syncMobNavActive();
 }
 
 /* FIX-SETTAB-CLOSE-CARD */
