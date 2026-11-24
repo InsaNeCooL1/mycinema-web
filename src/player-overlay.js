@@ -167,12 +167,17 @@
     function open() { render(); root.hidden = false; }
     function close() { root.hidden = true; }
     function toggle() { root.hidden ? open() : close(); }
-    function destroy() { if (root.parentNode) root.parentNode.removeChild(root); }
+    function destroy() {
+      root.hidden = true; /* інакше зомбі-Escape блокує закривання карток/модалок */
+      if (doc && onKeydown) doc.removeEventListener('keydown', onKeydown, true);
+      if (root.parentNode) root.parentNode.removeChild(root);
+    }
 
     closeBtn.addEventListener('click', close);
-    doc.addEventListener('keydown', function (e) {
+    var onKeydown = function (e) {
       if (e.key === 'Escape' && !root.hidden) { e.stopPropagation(); close(); }
-    }, true);
+    };
+    if (doc) doc.addEventListener('keydown', onKeydown, true);
 
     render();
     return {

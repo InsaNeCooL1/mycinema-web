@@ -9,12 +9,10 @@ const TMDB_IMG = "https://image.tmdb.org/t/p/";
 // ============ CONSTANTS ============
 const LS = "mycinema.library";
 const LS_VER = "mycinema.library.v";
-const RECS_CACHE = "mycinema.recs.v7"; /* FIX-CACHE-BUMP */
+const RECS_CACHE = "mycinema.recs.v8"; /* FIX-CACHE-BUMP */
 const EXCLUDED_TV_GENRES = [10763, 10764, 10767];
 const ANIMATION_GENRE_ID = 16;
 const CAST_LIMIT = 10;
-const ELO_START = 1500;
-const ELO_K = 32;
 const TASTE_HALFLIFE_DAYS = 180;
 const ACTOR_ADJUST_STEP = 0.35;
 const ACTOR_ADJUST_KEY = 'mycinema.actorAdjustments';
@@ -26,7 +24,7 @@ const ACTOR_PENALTY_CAP = 0.25;
 const ACTOR_FRANCHISE_CAP = 0.09;
 const MCU_COMPANY_IDS = [420, 38679];
 /* FIX-LOCAL-KEYS */
-window.MC_LOCAL_KEYS = ['mycinema.library','mycinema.library.v','mycinema.deleted','mycinema.dismissed','mycinema.dismissedClearedAt','mycinema.actorAdjustments','mycinema.actorAdjustTs','mycinema.search_history','kingOfTheHillHistory','mycinema.recs.v7','mycinema.home.general.v7','mycinema.metaCache.v2','mycinema.colCache.v1','mycinema.appearance.ts','mycinema.splashPool.v1','onboardingDone','mycinema.librarySort','mycinema.home.tab','mycinema.home.mode','mycinema.activeTab','mycinema.releaseCache.v1','mycinema.streamPrefs.v1','mycinema.streamResume.v1','mycinema.imdbRatings.v1','mycinema.titleLogos.v2','mycinema.online','mycinema.room']; /* FIX-PERSIST-KEYS + FIX-LOGOUT-ONLINE */ // Marvel Studios (420), Marvel Television (38679) // Marvel Studios (420), Marvel Television (38679)
+window.MC_LOCAL_KEYS = ['mycinema.library','mycinema.library.v','mycinema.deleted','mycinema.dismissed','mycinema.dismissedClearedAt','mycinema.actorAdjustments','mycinema.actorAdjustTs','mycinema.search_history','mycinema.recs.v8','mycinema.home.general.v7','mycinema.metaCache.v2','mycinema.colCache.v1','mycinema.appearance.ts','mycinema.splashPool.v1','onboardingDone','mycinema.librarySort','mycinema.home.tab','mycinema.home.mode','mycinema.activeTab','mycinema.releaseCache.v1','mycinema.streamPrefs.v1','mycinema.streamResume.v1','mycinema.imdbRatings.v1','mycinema.titleLogos.v2','mycinema.online','mycinema.room']; /* FIX-PERSIST-KEYS + FIX-LOGOUT-ONLINE */ // Marvel Studios (420), Marvel Television (38679) // Marvel Studios (420), Marvel Television (38679)
 
 // ============ MOODS ============
 /* FIX-MOOD-WEIGHT-CFG

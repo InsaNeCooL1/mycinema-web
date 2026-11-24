@@ -55,8 +55,6 @@
 
     <div class="nav-item nav-top-item nav-item-accent" data-tab="statistics" onclick="setTab('statistics')"><span class="nav-icon">📊</span> <span>Обсерваторія</span></div>
 
-    <div class="nav-item nav-top-item" data-tab="game" onclick="setTab('game')"><span class="nav-icon">👑</span> <span>Цар гори</span></div>
-
     <div class="nav-group nav-more-group" data-group="more" style="display:none;">
       <button type="button" class="nav-group-btn" onclick="toggleNavGroup('more', event)">
         Ще <span class="nav-caret">▾</span>
@@ -106,7 +104,6 @@
         <span class="btn-label">Оновити</span>
       </span>
     </button></div>
-  </div>
   </div>
 </div>
 
@@ -232,27 +229,8 @@
       <div class="settings-section-title">Спосіб перегляду</div>
       <label class="settings-toggle">
         <input type="checkbox" id="streams-enable-toggle">
-        <span>Дивитись на UAKINO</span>
+        <span>Перегляд онлайн</span>
       </label>
-    </div>
-
-    <div class="settings-section" id="online-network-fields">
-      <div class="settings-section-title">Підключення по мережі</div>
-      <label class="settings-field-label" for="room-url">URL кімнати</label>
-      <input id="room-url" class="settings-field" placeholder="http://192.168.x.x:8082/room.html" autocomplete="off">
-      <label class="settings-field-label" for="room-parser-url">URL парсеру</label>
-      <input id="room-parser-url" class="settings-field" autocomplete="off">
-      <label class="settings-field-label" for="room-parser-api">API парсеру</label>
-      <input id="room-parser-api" class="settings-field" autocomplete="off">
-      <label class="settings-field-label" for="room-server-url">Посилання на сервер</label>
-      <input id="room-server-url" class="settings-field" placeholder="http://localhost:8092" autocomplete="off">
-      <div class="settings-field-actions">
-        <button class="settings-btn" id="room-save">Зберегти</button>
-        <button class="settings-btn" id="room-check" type="button">Перевірити кімнату</button>
-        <button class="settings-btn" id="room-default" type="button">Стандартна</button>
-      </div>
-      <div id="room-status" class="settings-field-status"></div>
-      <div class="notes-hint">Дані зберігаються в хмарі акаунта (при вході) і передаються в кімнату при відкритті.</div>
     </div>
 
     <div class="settings-section">

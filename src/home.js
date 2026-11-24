@@ -3,6 +3,11 @@
 // ============ RECOMMENDATIONS ENGINE V2 ============
 const GEN_CACHE = 'mycinema.home.general.v7'; /* FIX-GEN-CACHE-BUMP */
 const RECS_TTL = 48 * 60 * 60 * 1000;  // 48 годин /* FIX-RECS-CACHE-V2 */
+
+/* Impressions: тайтли, що постійно з'являються, але не відкриваються,
+   отримують м'який exposure decay, щоб стрічка не застоювалась. */
+const _recImpressions = new Map();
+window.markRecOpened = (key) => { if (key) _recImpressions.delete(key); };
 const GEN_TTL = 12 * 60 * 60 * 1000;  // 12 годин
 
 function isExcludedShow(raw, type) {
@@ -107,9 +112,8 @@ async function ensureLibraryImdb() {
     // Неоцінені «Планую»/watching не впливають на математику — не шлемо їх.
     const avg = computeItemRating(x).avg;
     const cast = getItemCastRating(x);
-    const elo = typeof x.elo === 'number' ? x.elo : ELO_START;
-    const highElo = (x.eloGames || 0) > 0 && elo >= 1530;
-    if (avg <= 0 && cast <= 0 && !x.favorite && !highElo) continue;
+    const strongSignal = (x.rewatches || 0) > 0 || Object.values(x.epReactions || {}).some(v => v === '😍' || v === 'love');
+    if (avg <= 0 && cast <= 0 && !x.favorite && !strongSignal) continue;
 
     const t = (x.type === 'tv') ? 'tv' : 'movie';
     if (typeof imdbLookup === 'function' && imdbLookup(t, x.id)) continue;
@@ -185,6 +189,8 @@ function packCompactMeta(d, type) {
     kws,
     kwNames: kwList.map(k => ({ id: k.id, name: k.name })),
     genres,
+    countries: (d.production_countries || []).map(c => c.iso_3166_1).filter(Boolean),
+    lang: d.original_language || '',
     /* FIX-RELEASE-PACK-META */
     digitalDate: (typeof extractDigitalDate === 'function') ? extractDigitalDate(d) : null,
     providersUA: (typeof extractProvidersUA === 'function') ? extractProvidersUA(d) : []
@@ -227,58 +233,115 @@ async function mapBatched(items, batchSize, fn) {
 }
 
 function getSeeds() {
-  const candidates = Object.values(lib)
-    .map(x => {
-      const avg = computeItemRating(x).avg;
-      const isFav = !!x.favorite;
-      const elo = typeof x.elo === 'number' ? x.elo : ELO_START;
-      const hasHighElo = (x.eloGames || 0) > 0 && elo >= 1530;
-      if (!x.id || x.antiSeed || isExcludedFromTaste(x, avg)) return null;
-      if (avg < 6.5 && !isFav && !hasHighElo) return null;
+  const taste = (typeof computeTasteVector === 'function') ? computeTasteVector() : null;
+  const dom = getDominantCriterion(taste);
+  /* ДНК смаку: домінантний критерій має більшу вагу у силі сіду. */
+  const critW = {};
+  RATING_CRITERIA.forEach(c => { critW[c.key] = (dom && dom.key === c.key) ? 1.5 : 1; });
+  const wSum = RATING_CRITERIA.reduce((s, c) => s + critW[c.key], 0) || 1;
 
-      const base = avg > 0 ? avg : (isFav ? 8.6 : 8.2);
-      const favBonus = isFav ? 1.2 : 0;
-      const eloBonus = elo > ELO_START ? Math.min((elo - ELO_START) / 100, 1.5) : 0;
-      const strength = Math.min(10, base + favBonus + eloBonus);
+  const epSignal = (x) => {
+    let love = 0, bored = 0;
+    Object.values(x.epReactions || {}).forEach(v => {
+      const k = String(v);
+      if (k === '😍' || k === 'love') love++;
+      else if (k === '😴' || k === 'bored' || k === 'sleep') bored++;
+    });
+    return { love, bored };
+  };
 
-      // Big bang: residual рахуємо від IMDb. Якщо даних немає — TMDB як
-      // тимчасовий фольбек (головне, щоб обидва боки були з одного джерела).
-      const ref = (typeof imdbRef === 'function') ? imdbRef(x) : null;
-      const refVal = ref ? ref.rating : (x.tmdbRating || 0);
-      const defaultRef = x.type === 'tv' ? 7.6 : 6.9; // типові IMDb-середні
-      const residual = (avg > 0 && refVal > 0)
-        ? (avg - refVal)
-        : (avg > 0 ? avg - defaultRef : 0.8);
-      const resFactor = clampNum(1 + residual / 2, 0.3, 2);
-      const decayMult = Math.max(0.1, tasteDecay(x.updated));
-      const rankScore = (strength / 10) * resFactor * (0.35 + 0.65 * decayMult);
+  const candidates = Object.values(lib).map(x => {
+    const avg = computeItemRating(x).avg;
+    const isFav = !!x.favorite;
+    const rewatchCount = Math.max(0, x.rewatches || 0);
+    const rewatchDates = x.rewatchDates || [];
+    const lastRewatch = rewatchDates.length ? Math.max(...rewatchDates.map(Number).filter(Number.isFinite)) : 0;
+    const eps = epSignal(x);
+    const strongSignal = rewatchCount > 0 || eps.love >= 2;
 
-      return { ...x, avg, isFav, elo, strength, residual, resFactor, decayMult, rankScore };
-    })
-    .filter(Boolean);
+    /* Останній оцінений сезон просів або серіал кинутий на початку — не сід. */
+    let seasonDrop = false;
+    if (x.type === 'tv') {
+      const srTs = x.seasonRatingTs || {};
+      const lastSeason = Object.keys(srTs).sort((a, b) => srTs[a] - srTs[b]).pop();
+      if (lastSeason !== undefined) {
+        const sAvg = computeAverage((x.seasonRatings || {})[lastSeason] || {});
+        if (sAvg > 0 && sAvg < 6) seasonDrop = true;
+      }
+      if (x.status === 'dropped' && (x.watchedEpisodes || []).length <= 3) seasonDrop = true;
+    }
+    if (!x.id || x.antiSeed || seasonDrop || isExcludedFromTaste(x, avg)) return null;
+    if (avg < 6.5 && !isFav && !strongSignal) return null;
+
+    const critRatings = x.ratings || {};
+    const weighted = RATING_CRITERIA.length
+      ? RATING_CRITERIA.reduce((s, c) => s + (critRatings[c.key] || 0) * critW[c.key], 0) / wSum
+      : avg;
+    const base = avg > 0
+      ? avg * 0.75 + (weighted > 0 ? weighted : avg) * 0.25
+      : (isFav ? 8.6 : 8.2);
+    const favBonus = isFav ? 1.2 : 0;
+    const rewatchBonus = Math.min(1.5, rewatchCount * 0.5 + Math.min(eps.love, 3) * 0.25);
+    const strength = Math.min(10, base + favBonus + rewatchBonus);
+
+    const ref = (typeof imdbRef === 'function') ? imdbRef(x) : null;
+    const refVal = ref ? ref.rating : (x.tmdbRating || 0);
+    const defaultRef = x.type === 'tv' ? 7.6 : 6.9;
+    const residual = (avg > 0 && refVal > 0) ? (avg - refVal) : (avg > 0 ? avg - defaultRef : 0.8);
+    const resFactor = clampNum(1 + residual / 2, 0.3, 2);
+
+    const seasonTs = Object.values(x.seasonRatingTs || {}).map(Number).filter(Number.isFinite);
+    const lastSeasonTs = seasonTs.length ? Math.max(...seasonTs) : 0;
+    const decayTs = Math.max(x.updated || 0, x.ratingUpdated || 0, lastRewatch, lastSeasonTs);
+    const decayMult = Math.max(0.1, tasteDecay(decayTs));
+    const rankScore = (strength / 10) * resFactor * (0.35 + 0.65 * decayMult);
+    return { ...x, avg, isFav, strength, residual, resFactor, decayMult, rankScore };
+  }).filter(Boolean);
 
   if (!candidates.length) return [];
 
-  const fresh = [...candidates].sort((a, b) => (b.updated || 0) - (a.updated || 0)).slice(0, 3);
-  const byResidual = [...candidates].sort((a, b) => b.rankScore - a.rankScore || (b.updated || 0) - (a.updated || 0));
+  const byType = { movie: [], tv: [] };
+  candidates.forEach(x => { (byType[x.type] || byType.movie).push(x); });
+  Object.values(byType).forEach(list => list.sort((a, b) => b.rankScore - a.rankScore || (b.updated || 0) - (a.updated || 0)));
 
   const picked = [];
-  const seen = new Set();
-  for (const s of fresh) {
-    if (!seen.has(s.key)) { seen.add(s.key); picked.push(s); }
+  const seenKeys = new Set();
+  const franchiseCount = new Map();
+  const take = (list, quota) => {
+    let n = 0;
+    for (const s of list) {
+      if (n >= quota || picked.length >= 10) break;
+      if (seenKeys.has(s.key)) continue;
+      const fr = s.franchiseKey || (s.colId ? 'col-' + s.colId : null);
+      if (fr && (franchiseCount.get(fr) || 0) >= 1) continue; /* 1 сід на франшизу */
+      seenKeys.add(s.key); picked.push(s); n++;
+      if (fr) franchiseCount.set(fr, (franchiseCount.get(fr) || 0) + 1);
+    }
+  };
+  /* Свіжі тайтли + квота movie/tv, щоб вкладка «Серіали» не була порожньою */
+  for (const list of Object.values(byType)) {
+    const fresh = [...list].sort((a, b) => (b.updated || 0) - (a.updated || 0)).slice(0, 1);
+    take(fresh, 1);
   }
-  /* REDUCE_SEED_OVERLOAD */
-  for (const s of byResidual) {
-    if (picked.length >= 10) break; // Топ-10 сідів дають точний зріз без перевантаження мережі
-    if (!seen.has(s.key)) { seen.add(s.key); picked.push(s); }
-  }
+  take(byType.movie, 5);
+  take(byType.tv, 5);
+  /* Добираємо до 10, якщо одного типу мало */
+  take(Object.values(byType).flat().sort((a, b) => b.rankScore - a.rankScore), 10);
   return picked;
 }
 
 function getAntiSeeds() {
   return Object.values(lib)
     .map(x => ({ ...x, avg: computeItemRating(x).avg }))
-    .filter(x => x.id && (x.status === 'dropped' || x.antiSeed === true) && x.excludeFromProfile !== true)
+    .filter(x => {
+      if (!x.id || x.excludeFromProfile === true) return false;
+      if (x.status === 'dropped' || x.antiSeed === true) return true;
+      /* Серіали з переважанням 😴 — м'який анти-сигнал навіть без «Закинуто» */
+      const rs = Object.values(x.epReactions || {}).map(v => String(v));
+      const bored = rs.filter(v => v === '😴' || v === 'bored' || v === 'sleep').length;
+      const love = rs.filter(v => v === '😍' || v === 'love').length;
+      return x.type === 'tv' && bored >= 2 && bored > love;
+    })
     .sort((a, b) => ((b.antiSeed ? 1 : 0) - (a.antiSeed ? 1 : 0)) || ((b.updated || 0) - (a.updated || 0)))
     .slice(0, 5);
 }
@@ -299,6 +362,26 @@ async function buildSmartRecommendations(seeds, mood, mode) {
   const taste = computeTasteVector();
   const domCrit = getDominantCriterion(taste);
   const antiSeeds = getAntiSeeds();
+  /* «Планую» за останні 30 днів — прямий сигнал поточного інтересу */
+  const _plannedRecent = Object.values(lib).filter(x =>
+    x.status === 'planned' && (x.updated || 0) > Date.now() - 30 * 86400000);
+  const plannedDirs = new Set();
+  const plannedKws = new Set();
+  _plannedRecent.forEach(x => {
+    (x.directors || []).forEach(d => plannedDirs.add(d.id || d));
+    (x.keywords || []).forEach(k => plannedKws.add(typeof k === 'object' ? k.id : k));
+  });
+  /* Країни/мови: легкий Байєс-подібний профіль по вже збережених метаданих */
+  const _libAll = Object.values(lib);
+  const animShare = _libAll.length
+    ? _libAll.filter(x => (x.genres || []).includes(ANIMATION_GENRE_ID)).length / _libAll.length : 0;
+  const countryScore = new Map();
+  Object.values(lib).forEach(x => {
+    const avg = computeItemRating(x).avg;
+    if (avg <= 0) return;
+    const w = clampNum(avg - 7, -2, 3);
+    (x.countries || []).forEach(c => countryScore.set(c, (countryScore.get(c) || 0) + w));
+  });
   const metaCache = readMetaCacheAll();
 
   const seedDetails = (await mapBatched(seeds, 8, async s => {
@@ -427,8 +510,13 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     gIds.forEach(gid => { anti.genres[gid] = (anti.genres[gid] || 0) + aw * 0.4; });
     (meta.kws || []).forEach(kid => { anti.keywords[kid] = (anti.keywords[kid] || 0) + aw; });
   }
+  /* Dismiss: караємо конкретну причину, а не весь широкий жанр */
+  const dismissTags = new Map();
   for (const d of Object.values(dismissedRecs || {})) {
-    (d.genres || []).forEach(gid => { anti.genres[gid] = (anti.genres[gid] || 0) + 0.25; });
+    (d.genres || []).forEach(gid => { anti.genres[gid] = (anti.genres[gid] || 0) + 0.05; });
+    (d.directors || []).forEach(id => { anti.directors[id] = (anti.directors[id] || 0) + 0.2; });
+    (d.cast || []).forEach(id => { anti.cast[id] = (anti.cast[id] || 0) + 0.15; });
+    (d.reasonTags || []).forEach(tag => dismissTags.set(tag, (dismissTags.get(tag) || 0) + 1));
   }
 
   const moodData = mood && MOODS[mood] ? MOODS[mood] : null;
@@ -463,7 +551,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     let entry = unique.get(key);
     if (!entry) {
       const item = normalizeItem({ ...raw, media_type: type });
-      entry = { ...item, _sourceRaw: 0, _eloHits: [], _reasons: [], _seenTags: new Set(), _meta: null };
+      entry = { ...item, _sourceRaw: 0, _reasons: [], _seenTags: new Set(), _meta: null };
       unique.set(key, entry);
     }
     return entry;
@@ -480,14 +568,12 @@ async function buildSmartRecommendations(seeds, mood, mode) {
   for (const { seed, recs } of seedDetails) {
     const seedRatingLabel = seed.avg > 0 ? ` (${fmtNum(seed.avg)})` : (seed.isFav ? ' ❤️' : '');
     const boost = Math.min(2.2, (seed.strength / 10) * seed.resFactor * seed.decayMult);
-    const seedEloNorm = (seed.eloGames || 0) > 0 ? clampNum((seed.elo - 1450) / 250, 0, 1) : 0;
 
     recs.forEach((r, idx) => {
       const t = r.media_type || seed.type;
       const entry = ensureCandidate(r, t);
       if (!entry) return;
       entry._sourceRaw += boost * (1 - idx * 0.045);
-      if (seedEloNorm > 0) entry._eloHits.push(seedEloNorm);
       addReason(entry, 'seed-' + seed.key, `Як «${seed.title}»${seedRatingLabel}`, 10);
     });
   }
@@ -508,6 +594,10 @@ async function buildSmartRecommendations(seeds, mood, mode) {
       p.set('sort_by', 'popularity.desc');
     }
     if (type === 'tv') p.set('without_genres', EXCLUDED_TV_GENRES.join(','));
+    if (settings.streamingOnlyUA) {
+      p.set('watch_region', 'UA');
+      p.set('with_watch_monetization_types', 'flatrate');
+    }
     return p;
   };
 
@@ -566,7 +656,6 @@ async function buildSmartRecommendations(seeds, mood, mode) {
         .catch(() => ({ type: 'movie', results: [], source: 'director' }))
     );
   });
-
   const all = await Promise.all(fetchPromises);
   for (const batch of all) {
     for (const r of batch.results) {
@@ -695,9 +784,6 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     entry._baseRaw = baseRaw;
     entry._genreMatch = genreMatch;
     entry._antiGenre = Math.min(0.3, antiGenre);
-    entry._eloRaw = entry._eloHits.length
-      ? entry._eloHits.reduce((a, b) => a + b, 0) / entry._eloHits.length
-      : 0;
     entry._bestGenreId = bestGenreId;
 
     /* FIX-MOOD-WEIGHT-PRE — mood genre match + source bonus */
@@ -753,9 +839,15 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     /* FIX-RELEASE-FINALIZE — post-filter on enriched (has _meta) */
     const _today = new Date().toISOString().slice(0, 10);
     const filtered = list.filter(x => {
-      if (!x._meta) return true;  // без meta не можемо перевірити — пропускаємо
+      if (settings.streamingOnlyUA && !x._meta) return false; // неможливо підтвердити наявність в UA
+      if (!x._meta) return true;
       if (settings.digitalOnly && x.type === 'movie') {
         if (x._meta.digitalDate && x._meta.digitalDate > _today) return false;
+        /* Немає дати цифри, але реліз свіжий — скоріше за все ще в кінотеатрах */
+        if (!x._meta.digitalDate && x._meta.releaseDate) {
+          const days = Math.round((Date.parse(_today) - Date.parse(x._meta.releaseDate.slice(0, 10))) / 86400000);
+          if (days >= 0 && days < 45) return false;
+        }
       }
       if (settings.streamingOnlyUA) {
         if (!x._meta.providersUA || x._meta.providersUA.length === 0) return false;
@@ -767,6 +859,12 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     const rest = filtered.filter(x => !x._meta); /* FIX-RELEASE-FINALIZE-REST */
 
     if (enriched.length) {
+      /* Динамічні ваги каналів профілю згідно з ДНК смаку */
+      const channelW = { cast: 1, dir: 1, kw: 1 };
+      if (domCrit && domCrit.key === 'cast') channelW.cast = 1.35;
+      else if (domCrit && domCrit.key === 'style') { channelW.dir = 1.35; channelW.kw = 1.15; }
+      else if (domCrit && (domCrit.key === 'plot' || domCrit.key === 'emotions')) channelW.kw = 1.35;
+
       for (const entry of enriched) {
         let actorMatch = 0;
         let directorMatch = 0;
@@ -822,8 +920,25 @@ async function buildSmartRecommendations(seeds, mood, mode) {
           addReason(entry, 'kw-' + bestKw, `Тема: ${names.keywords[bestKw] || 'ваша тема'}`, 4);
         }
 
-        entry._profileRaw = entry._genreMatch + actorMatch + directorMatch + kwMatch;
-        entry._antiPenalty = entry._antiGenre + Math.min(0.4, antiDir) + Math.min(0.35, antiKw) + Math.min(0.35, antiCast);
+        let plannedBoost = 0;
+        (entry._meta.dirs || []).forEach(d => { if (plannedDirs.has(d.id)) plannedBoost += 0.04; });
+        (entry._meta.kws || []).forEach(k => { if (plannedKws.has(k)) plannedBoost += 0.02; });
+        let geoBoost = 0;
+        (entry._meta.countries || []).forEach(c => {
+          geoBoost += 0.03 * clampNum((countryScore.get(c) || 0) / 3, -1, 1);
+        });
+        geoBoost = clampNum(geoBoost, -0.08, 0.08);
+        entry._profileRaw = entry._genreMatch
+          + actorMatch * channelW.cast
+          + directorMatch * channelW.dir
+          + kwMatch * channelW.kw
+          + Math.min(0.10, plannedBoost) + geoBoost;
+        let dismissPen = 0;
+        (entry._reasonTags || []).forEach(tag => {
+          if (dismissTags.has(tag)) dismissPen += Math.min(0.15, dismissTags.get(tag) * 0.05);
+        });
+        entry._antiPenalty = entry._antiGenre + Math.min(0.4, antiDir) + Math.min(0.35, antiKw)
+          + Math.min(0.35, antiCast) + Math.min(0.2, dismissPen);
         finalizeReasons(entry);
       }
 
@@ -885,7 +1000,40 @@ async function buildSmartRecommendations(seeds, mood, mode) {
       delete entry._moodBoost;
     }
 
-    return [...enriched, ...rest].sort((a, b) => b._sortScore - a._sortScore).slice(0, 80);
+    const final = [...enriched, ...rest].sort((a, b) => b._sortScore - a._sortScore);
+    final.sort((a, b) => b._sortScore - a._sortScore);
+
+    /* Жадібна диверсифікація перших 20 позицій */
+    const out = [];
+    const seenCol = new Map(), seenDir = new Map(), seenLead = new Map();
+    let animCount = 0;
+    for (const x of final) {
+      const col = x.colId || (metaCache[x.key] && metaCache[x.key].colId);
+      const dir = metaCache[x.key] && metaCache[x.key].dirs?.[0]?.id;
+      const lead = metaCache[x.key] && metaCache[x.key].cast?.[0]?.id;
+      const isAnim = (x.genres || []).includes(ANIMATION_GENRE_ID);
+      if (out.length < 20 && isAnim && (animCount + 1) / Math.max(1, out.length + 1) > Math.min(0.5, animShare + 0.15)) continue;
+      if (out.length < 20 && ((col && (seenCol.get(col) || 0) >= 2) ||
+          (dir && (seenDir.get(dir) || 0) >= 3) || (lead && (seenLead.get(lead) || 0) >= 3))) continue;
+      out.push(x);
+      if (isAnim) animCount++;
+      if (col) seenCol.set(col, (seenCol.get(col) || 0) + 1);
+      if (dir) seenDir.set(dir, (seenDir.get(dir) || 0) + 1);
+      if (lead) seenLead.set(lead, (seenLead.get(lead) || 0) + 1);
+      if (out.length >= 80) break;
+    }
+    out.slice(0, 20).forEach(x => {
+      const n = _recImpressions.get(x.key) || 0;
+      if (n > 2) x._sortScore -= Math.min(0.15, (n - 2) * 0.05);
+      _recImpressions.set(x.key, n + 1);
+    });
+    if (_recImpressions.size > 300) {
+      const keys = [..._recImpressions.keys()];
+      for (let i = 0; i < keys.length - 200; i++) _recImpressions.delete(keys[i]);
+    }
+    out.sort((a, b) => b._sortScore - a._sortScore);
+    final.forEach(x => { if (!out.includes(x)) out.push(x); });
+    return out.slice(0, 80);
   };
 
   const collections = [];
@@ -1046,8 +1194,7 @@ function getLastRatedProjects(limit) {
   const entries = [];
   Object.values(lib).forEach(item => {
     if (!item || !item.key) return;
-    const isEloUntracked = (item.eloUpdated && item.updated === item.eloUpdated) || (item.eloGames > 0 && !item.ratingUpdated);
-    const safeBaseTs = isEloUntracked ? (item.createdAt || item.updated || 0) : (item.updated || item.createdAt || 0);
+    const safeBaseTs = item.updated || item.createdAt || 0;
     if (item.type === 'movie') {
       const avg = computeAverage(item.ratings);
       if (avg > 0) {
@@ -1066,9 +1213,7 @@ function getLastRatedProjects(limit) {
       Object.entries(sr).forEach(([sNum, ratings]) => {
         const avg = computeAverage(ratings);
         if (avg > 0) {
-          const tvBase = (item.eloUpdated && item.updated === item.eloUpdated) || (item.eloGames > 0 && !srTs[sNum])
-            ? (item.createdAt || item.updated || 0)
-            : (item.updated || item.createdAt || 0);
+          const tvBase = item.updated || item.createdAt || 0;
           entries.push({
             key: `${item.key}-s${sNum}`,
             item,
@@ -1462,10 +1607,19 @@ function computeRecsSignature(seeds) {
   const castSig = `${castVals.length}:${castVals.reduce((a, b) => a + b, 0).toFixed(1)}`;
   const day = new Date().toISOString().slice(0, 10);
   const moodW = state.home.mood && MOODS[state.home.mood] ? (MOODS[state.home.mood].weight || 1) : 0; /* FIX-MOOD-AGGR-SIG */
-  return `v17-rails|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}:${moodW}|mode:${state.home.mode || 'balance'}|dig:${settings.digitalOnly ? 1 : 0}|str:${settings.streamingOnlyUA ? 1 : 0}`; /* FIX-IMDB-SIG */
+  const rwSig = Object.values(lib).map(x => `${x.key}:${x.rewatches || 0}:${(x.rewatchDates || []).length}:${Object.keys(x.epReactions || {}).length}`).join(',');
+  const disSig = Object.keys(dismissedRecs || {}).length + ':' + Object.values(dismissedRecs || {}).reduce((s, d) => s + (d.reasonTags || []).join(','), '');
+  const planSig = Object.values(lib).filter(x => x.status === 'planned').map(x => x.key).join(',');
+  return `v18-rails|${day}|n:${state.home.refreshNonce || 0}|rw:${rwSig}|dis:${disSig}|plan:${planSig}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}:${moodW}|mode:${state.home.mode || 'balance'}|dig:${settings.digitalOnly ? 1 : 0}|str:${settings.streamingOnlyUA ? 1 : 0}`; /* FIX-IMDB-SIG */
 }
 
+let _homeRenderScroll = 0;
+
 async function loadHome() {
+  /* Позицію зберігаємо тільки при перемальовуванні вже відкритої головної,
+     а не при переході з іншої вкладки. */
+  if (state.tab === 'home' && box.querySelector('.home-wrap')) _homeRenderScroll = window.scrollY;
+  else _homeRenderScroll = 0;
   if (state.tab !== 'home') return;
   if (!state.home.mode) state.home.mode = 'balance';
 
@@ -1633,7 +1787,6 @@ function renderHomeSkeleton(taste) {
   const head = el('div', 'section-head');
   head.append(el('h2', 'section-title', '✨ Для тебе'));
   sec.append(head);
-  sec.append(buildRecsControlsBar());
 
   const grid = el('div', 'home-grid');
   for (let i = 0; i < 14; i++) {
@@ -1646,9 +1799,6 @@ function renderHomeSkeleton(taste) {
   }
   sec.append(grid);
   wrap.append(sec);
-
-  const plannedSec = buildPlannedByMoodSection();
-  if (plannedSec) wrap.append(plannedSec);
 
   box.append(wrap);
 }
@@ -1969,7 +2119,7 @@ function renderHomeHero(hero) {
   return sec;
 }
 
-function renderRailSection(rail) {
+function renderRailSection(rail, immediate) {
   const sec = el('section', 'home-section rail-section');
   const head = el('div', 'section-head rail-head');
   const h = el('h2', 'section-title', rail.title);
@@ -1989,15 +2139,19 @@ function renderRailSection(rail) {
     rail.items.forEach(it => frag.append(recCard(it, true, true)));
     grid.append(frag);
   };
-  if (typeof IntersectionObserver !== 'undefined') {
+  if (immediate || typeof IntersectionObserver === 'undefined') {
+    /* Перші полиці заповнюємо одразу — інакше швидкий скрол пролітає
+       повз порожні 40px-заглушки й екран лишається порожнім. */
+    fillRail();
+    sec.classList.add('revealed');
+  } else {
     const io = new IntersectionObserver((entries) => {
-      if (entries.some(x => x.isIntersecting)) { fillRail(); sec.classList.add('revealed'); io.disconnect(); sec._railIO = null; }
+      if (entries.some(x => x.isIntersecting || x.boundingClientRect.top < window.innerHeight)) {
+        fillRail(); sec.classList.add('revealed'); io.disconnect(); sec._railIO = null;
+      }
     }, { rootMargin: '500px 0px' });
     sec._railIO = io;
     io.observe(sec);
-  } else {
-    fillRail();
-    sec.classList.add('revealed');
   }
   const step = () => {
     const card = grid.querySelector('.rec-card');
@@ -2163,7 +2317,6 @@ function renderSettingsPage() {
   if (typeof injectSnowToggle === 'function') injectSnowToggle();
   if (typeof injectExtraSettings === 'function') injectExtraSettings();
   if (typeof injectDismissedReset === 'function') injectDismissedReset();
-  if (typeof injectFilmixSettings === 'function') injectFilmixSettings();
   if (typeof refreshSettingsControls === 'function') refreshSettingsControls();
 
   Object.keys(groups).forEach(key => {
@@ -2201,10 +2354,12 @@ function renderSettingsPage() {
     accCard.append(refreshBtn);
     _settingsMoved.push({ box: refreshBtn, parent: refreshSlot });
   }
-  const logout = el('button', 'settings-page-action', 'Вийти з акаунту');
-  logout.type = 'button';
-  logout.onclick = () => { if (typeof logoutUser === 'function') logoutUser(); };
-  accCard.append(logout);
+  if (window.currentUser) {
+    const logout = el('button', 'settings-page-action', 'Вийти з акаунту');
+    logout.type = 'button';
+    logout.onclick = () => { if (typeof logoutUser === 'function') logoutUser(); };
+    accCard.append(logout);
+  }
 
   // Елементи розділу «Дані» — нижче за акаунт
   const dataModal = document.getElementById(groups.data);
@@ -2325,7 +2480,7 @@ function renderHomeRails(recs, wrap) {
   const paint = (res) => {
     host.querySelectorAll('.rail-section').forEach(sec => { if (sec._railIO) sec._railIO.disconnect(); });
     host.replaceChildren();
-    res.rails.forEach(r => host.append(renderRailSection(r)));
+    res.rails.forEach((r, i) => host.append(renderRailSection(r, i < 4)));
   };
   paint(result);
 
@@ -2526,11 +2681,13 @@ function renderHomeContent(taste) {
       wrap.append(el('div', 'home-note', 'Постав оцінку 7+ або ❤️ улюбленому фільму чи серіалу — і тут з\'являться персональні рекомендації.'));
     }
 
-    const plannedSec = buildPlannedByMoodSection();
-    if (plannedSec) wrap.append(plannedSec);
   }
 
   box.append(wrap);
+  if (_homeRenderScroll) {
+    window.scrollTo(0, _homeRenderScroll);
+    _homeRenderScroll = 0;
+  }
 }
 
 const _nextEpSeasonCache = new Map();

@@ -198,7 +198,7 @@ function collectCandidates(ctx) {
     add({
       id: 'q-year-' + y, kind: 'year', group: 'quality',
       title: `Найкращі ${y}-х`, subtitle: 'Рік вашого смаку',
-      pick: (items) => items.filter(x => railYear(x) >= y && railYear(x) <= y + 2)
+      pick: (items) => items.filter(x => railYear(x) === y)
         .sort((a, b) => railRating(b, ctx) - railRating(a, ctx))
     });
   });
@@ -421,14 +421,15 @@ function buildRails(opts) {
   const rng = railRng(`${o.userId || 'guest'}|${o.dateKey || ''}|${o.nonce || 0}|rails`);
   if (!ctx.generalPool.length) {
     const seen = new Set();
-    ctx.generalPool = (ctx.general.trMovies || [])
-      .concat(ctx.general.newMovies || [], ctx.general.topMovies || [])
-      .concat(...ctx.tvStreams.map(s => (s.items || []).slice(0, 20)))
-      .filter(x => x && x.key && !seen.has(x.key) && seen.add(x.key));
+    const rawGeneral = ctx.type === 'tv'
+      ? [].concat(...ctx.tvStreams.map(s => (s.items || []).slice(0, 20)))
+      : (ctx.general.trMovies || []).concat(ctx.general.newMovies || [], ctx.general.topMovies || []);
+    ctx.generalPool = rawGeneral
+      .filter(x => x && x.key && x.type === ctx.type && !seen.has(x.key) && seen.add(x.key));
   }
   ctx.hero = buildHero(ctx, railRng(`${o.userId || 'guest'}|${o.dateKey || ''}|${o.nonce || 0}|hero`));
   ctx.allItems = ctx.items.concat(ctx.generalPool).filter((x, i, arr) =>
-    x && x.key && arr.findIndex(y => y && y.key === x.key) === i);
+    x && x.key && x.type === ctx.type && arr.findIndex(y => y && y.key === x.key) === i);
   const candidates = collectCandidates(ctx);
   candidates.forEach(c => {
     if (['quality', 'catalog', 'availability', 'collection', 'decade', 'mode', 'hub'].indexOf(c.group) !== -1) c.scope = 'all';

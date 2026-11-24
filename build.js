@@ -22,7 +22,6 @@ const SRC_FILES = [
   'src/world-map-data.js',
   'src/world-map.js',
   'src/stats.js',
-  'src/game.js',
   'src/streams.js',
   'src/room.js',
   'src/card/engine.js',

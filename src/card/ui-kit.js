@@ -631,6 +631,28 @@
         gv.className = 'score-total-val' + (totalRating.avg > 0 ? ' ' + tempCls(totalRating.avg * 10) : '');
         gv.textContent = totalRating.avg > 0 ? fmtNum(totalRating.avg) : '—';
       }
+
+      // Синхронізуємо решту картки: бейдж постера, бейдж вкладки сезону, статус
+      const hero = card.querySelector('.mobile-hero');
+      if (hero && !ctx.playingTrailer) {
+        let badge = hero.querySelector('.hero-badge');
+        if (totalRating.avg > 0) {
+          const cls = 'hero-badge ' + getTempClass(totalRating.avg * 10);
+          if (!badge) { badge = el('div', cls, fmtNum(totalRating.avg)); hero.append(badge); }
+          else { badge.className = cls; badge.textContent = fmtNum(totalRating.avg); }
+        } else if (badge) badge.remove();
+      }
+      const activeSeasonBtn = card.querySelector('.season-tab-btn.active');
+      if (activeSeasonBtn) {
+        const sAvgAll = computeAverage(sr);
+        let sb = activeSeasonBtn.querySelector('.season-tab-badge');
+        if (sAvgAll > 0) {
+          if (!sb) { sb = el('span', 'season-tab-badge', '⭐ ' + fmtNum(sAvgAll)); activeSeasonBtn.append(sb); }
+          else sb.textContent = '⭐ ' + fmtNum(sAvgAll);
+        } else if (sb) sb.remove();
+      }
+      const watchBtn = card.querySelector('.title-watch-btn');
+      if (watchBtn) watchBtn.classList.toggle('active', cur.status === 'watching');
     };
 
     paint();

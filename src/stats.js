@@ -24,7 +24,6 @@ function renderStatistics() {
     { id: 'franchises', label: '🎞️ Франшизи' },
     { id: 'countries', label: '🌍 Країни' },
     { id: 'streaming', label: '📡 Стрімінги' },
-    { id: 'elo', label: '🏆 Elo' },
     { id: 'actors', label: '🎭 Актори' },
     { id: 'directors', label: '🎬 Режисери' },
     { id: 'genres', label: '🎞️ Жанри' },
@@ -43,7 +42,6 @@ function renderStatistics() {
   else if (state.stats.tab === 'franchises') content.append(...renderFranchisesTab());
   else if (state.stats.tab === 'countries') content.append(...renderCountriesTab());
   else if (state.stats.tab === 'streaming') content.append(...renderStreamingTab());
-  else if (state.stats.tab === 'elo') content.append(...renderEloTab());
   else if (state.stats.tab === 'wrapped') content.append(...renderWrappedTab());
   else if (state.stats.tab === 'actors') content.append(...renderActorsTab());
   else if (state.stats.tab === 'directors') content.append(...renderDirectorsTab());
@@ -247,10 +245,10 @@ function renderTasteTab() {
     });
   }
 
-  // 3. Найвищий бал (з Elo tie-breaker і всіма типами)
+  // 3. Найвищий бал (усі типи)
   if (rated.length > 0) {
     const sortedTop = [...rated].sort((a, b) =>
-      (b.r.avg - a.r.avg) || ((b.item.elo || ELO_START) - (a.item.elo || ELO_START))
+      (b.r.avg - a.r.avg) || ((b.item.updated || 0) - (a.item.updated || 0))
     );
     const bestScore = sortedTop[0].r.avg;
     const tiedCount = sortedTop.filter(x => Math.abs(x.r.avg - bestScore) < 0.05).length;
@@ -439,12 +437,12 @@ function renderSeriesTab() {
         const pct = tot > 0 ? Math.min(100, Math.round((done / tot) * 100)) : 0;
         const row = el('div', 'series-prog-row');
         if (s.poster) {
-          const p = el('img', 'elo-poster'); p.src = TMDB_IMG + 'w92' + s.poster; p.loading = 'lazy';
+          const p = el('img', 'rank-poster'); p.src = TMDB_IMG + 'w92' + s.poster; p.loading = 'lazy';
           row.append(p);
         }
         const body = el('div', 'series-prog-body');
         const top = el('div', 'series-prog-top');
-        top.append(el('span', 'elo-title', s.title));
+        top.append(el('span', 'rank-title', s.title));
         const valTxt = tot > 0 ? `${done}/${tot} (${pct}%)` : `${done} сер.`;
         top.append(el('span', 'series-prog-val', valTxt));
         body.append(top);
@@ -457,7 +455,7 @@ function renderSeriesTab() {
 
         if (tot > done && s.runtime > 0) {
           const remHrs = ((tot - done) * s.runtime) / 60;
-          body.append(el('div', 'elo-games', `залишилось ~${remHrs >= 10 ? Math.round(remHrs) : fmtNum(remHrs)} год`));
+          body.append(el('div', 'rank-games', `залишилось ~${remHrs >= 10 ? Math.round(remHrs) : fmtNum(remHrs)} год`));
         }
         row.append(body);
         row.addEventListener('click', () => openCard(s));
@@ -480,19 +478,19 @@ function renderSeriesTab() {
 
   if (byTime.length) {
     wrap.append(el('h3', 'label', '⏱️ Найбільше часу проведено за серіалами'));
-    const lb = el('div', 'elo-lb');
+    const lb = el('div', 'rank-lb');
     byTime.forEach((x, idx) => {
-      const row = el('div', 'elo-row');
-      row.append(el('div', 'elo-rank', String(idx + 1)));
+      const row = el('div', 'rank-row');
+      row.append(el('div', 'rank-rank', String(idx + 1)));
       if (x.item.poster) {
-        const p = el('img', 'elo-poster'); p.src = TMDB_IMG + 'w92' + x.item.poster; p.loading = 'lazy';
+        const p = el('img', 'rank-poster'); p.src = TMDB_IMG + 'w92' + x.item.poster; p.loading = 'lazy';
         row.append(p);
       }
-      const info = el('div', 'elo-info');
-      info.append(el('div', 'elo-title', x.item.title));
-      info.append(el('div', 'elo-games', `${x.eps} ${plural(x.eps, 'серія', 'серії', 'серій')}`));
+      const info = el('div', 'rank-info');
+      info.append(el('div', 'rank-title', x.item.title));
+      info.append(el('div', 'rank-games', `${x.eps} ${plural(x.eps, 'серія', 'серії', 'серій')}`));
       row.append(info);
-      row.append(el('div', 'elo-value', x.mins > 0 ? fmtDuration(x.mins) : `${x.eps} с.`));
+      row.append(el('div', 'rank-value', x.mins > 0 ? fmtDuration(x.mins) : `${x.eps} с.`));
       row.addEventListener('click', () => openCard(x.item));
       lb.append(row);
     });
@@ -657,7 +655,7 @@ function renderFranchisesTab() {
 
     const row = el('div', 'franchise-head');
     if (fr.poster) {
-      const p = el('img', 'elo-poster'); p.src = TMDB_IMG + 'w92' + fr.poster; p.loading = 'lazy';
+      const p = el('img', 'rank-poster'); p.src = TMDB_IMG + 'w92' + fr.poster; p.loading = 'lazy';
       row.append(p);
     } else {
       row.append(el('div', 'actor-rank-photo-empty', '🎞️'));
@@ -665,7 +663,7 @@ function renderFranchisesTab() {
 
     const body = el('div', 'franchise-body');
     const top = el('div', 'series-prog-top');
-    top.append(el('span', 'elo-title', fr.name));
+    top.append(el('span', 'rank-title', fr.name));
     const rightVal = fr.avgRating > 0
       ? `⭐ ${fmtNum(fr.avgRating)}`
       : (fr.completed ? '✓ 100%' : `${fr.pct}%`);
@@ -676,7 +674,7 @@ function renderFranchisesTab() {
     let subTxt = `${fr.watchedCount} з ${fr.totalParts} ${plural(fr.totalParts, 'фільм', 'фільми', 'фільмів')}`;
     if (fr.completed) subTxt += ' · Завершено';
     if (fr.mins > 0) subTxt += ` · ~${fmtDuration(fr.mins)}`;
-    body.append(el('div', 'elo-games', subTxt));
+    body.append(el('div', 'rank-games', subTxt));
 
     const bar = el('div', 'item-progress');
     const fill = el('div', 'item-progress-fill');
@@ -703,8 +701,8 @@ function renderFranchisesTab() {
         } else {
           pr.append(el('div', 'franchise-part-poster poster-empty'));
         }
-        const pi = el('div', 'elo-info');
-        pi.append(el('div', 'elo-title', partItem.title || p.title));
+        const pi = el('div', 'rank-info');
+        pi.append(el('div', 'rank-title', partItem.title || p.title));
         const isFuture = p.release_date && p.release_date > todayIso;
         let meta = partItem.year || (isFuture ? 'Анонс' : '—');
         if (saved?.status === 'watched') meta += ' · ✅ Переглянуто';
@@ -712,7 +710,7 @@ function renderFranchisesTab() {
         else if (saved?.status === 'dropped') meta += ' · 🕸️ Закинуто';
         else if (isFuture) meta += ' · 🗓️ Незабаром';
         else meta += ' · Ще не в бібліотеці';
-        pi.append(el('div', 'elo-games', meta));
+        pi.append(el('div', 'rank-games', meta));
         pr.append(pi);
 
         const sAvg = saved ? computeItemRating(saved).avg : 0;
@@ -985,13 +983,13 @@ function renderCountriesTab() {
 
     const body = el('div', 'franchise-body');
     const top = el('div', 'series-prog-top');
-    top.append(el('span', 'elo-title', c.name));
+    top.append(el('span', 'rank-title', c.name));
     const rightTxt = c.avg > 0 ? `⭐ ${fmtNum(c.avg)}` : String(c.watched);
     const valCls = 'series-prog-val' + (c.avg > 0 ? ' ' + ratingClass(c.avg) : '');
     top.append(el('span', valCls, rightTxt));
     body.append(top);
 
-    body.append(el('div', 'elo-games', `${c.watched} ${plural(c.watched, 'тайтл', 'тайтли', 'тайтлів')} · ${c.movies} ф. · ${c.tv} с.`));
+    body.append(el('div', 'rank-games', `${c.watched} ${plural(c.watched, 'тайтл', 'тайтли', 'тайтлів')} · ${c.movies} ф. · ${c.tv} с.`));
 
     const bar = el('div', 'item-progress');
     const fill = el('div', 'item-progress-fill');
@@ -1020,11 +1018,11 @@ function renderCountriesTab() {
           } else {
             pr.append(el('div', 'franchise-part-poster poster-empty'));
           }
-          const pi = el('div', 'elo-info');
-          pi.append(el('div', 'elo-title', it.title || ''));
+          const pi = el('div', 'rank-info');
+          pi.append(el('div', 'rank-title', it.title || ''));
           const stLabel = it.status === 'watched' ? '✅' : (it.status === 'watching' ? '▶️' : (it.status === 'dropped' ? '🕸️' : ''));
           const metaStr = [it.type === 'tv' ? 'Серіал' : 'Фільм', it.year, stLabel].filter(Boolean).join(' · ');
-          pi.append(el('div', 'elo-games', metaStr));
+          pi.append(el('div', 'rank-games', metaStr));
           pr.append(pi);
 
           const sAvg = computeItemRating(it).avg;
@@ -1144,39 +1142,6 @@ function renderStreamingTab() {
   return [wrap];
 }
 
-function renderEloTab() {
-  const wrap = el('div');
-  const withElo = Object.values(lib).filter(x => x.eloGames && x.eloGames > 0).sort((a, b) => (b.elo || ELO_START) - (a.elo || ELO_START));
-  if (!withElo.length) {
-    wrap.append(el('div', 'avail-empty', 'Пограй у «Цар гори», щоб побудувати Elo-рейтинг своїх тайтлів'));
-    return [wrap];
-  }
-  const card = el('div', 'insight-card');
-  card.append(el('div', 'insight-label', '🏆 Elo-рейтинг'));
-  const topTitles = withElo.slice(0, 3).map((x, i) => `${i + 1}. ${x.title}`).join(' · ');
-  card.append(el('div', 'insight-text', 'Топ: ' + topTitles));
-  wrap.append(card);
-
-  wrap.append(el('h3', 'label', `Топ за Elo (${withElo.length})`));
-  const lb = el('div', 'elo-lb');
-  withElo.slice(0, 30).forEach((x, i) => {
-    const row = el('div', 'elo-row');
-    row.append(el('div', 'elo-rank', String(i + 1)));
-    if (x.poster) {
-      const p = el('img', 'elo-poster'); p.src = TMDB_IMG + 'w92' + x.poster; p.loading = 'lazy';
-      row.append(p);
-    } else row.append(el('div', 'elo-poster'));
-    const info = el('div', 'elo-info');
-    info.append(el('div', 'elo-title', x.title));
-    info.append(el('div', 'elo-games', `${x.eloGames} ${plural(x.eloGames, 'матч', 'матчі', 'матчів')}`));
-    row.append(info);
-    row.append(el('div', 'elo-value' + (i < 3 ? ' top' : ''), String(Math.round(x.elo))));
-    row.addEventListener('click', () => openCard(x));
-    lb.append(row);
-  });
-  wrap.append(lb);
-  return [wrap];
-}
 
 function renderActorsTab() {
   const wrap = el('div');
@@ -1299,7 +1264,7 @@ function renderActorsTab() {
 function getItemEventTimestamps(item) {
   const out = [];
   if (!item) return out;
-  const base = item.statusDate || (item.eloUpdated && item.updated === item.eloUpdated ? item.createdAt : (item.eloGames > 0 && item.createdAt ? item.createdAt : item.updated)) || item.createdAt;
+  const base = item.statusDate || item.ratingUpdated || item.updated || item.createdAt;
   if (hasWatched(item) && base) out.push(base);
   if (item.ratingUpdated) out.push(item.ratingUpdated);
   if (Array.isArray(item.rewatchDates)) item.rewatchDates.forEach(d => { if (d) out.push(d); });
@@ -1368,7 +1333,7 @@ function computeWrappedStats(mode, periodKey) {
   const allRated = all.map(x => computeItemRating(x).avg).filter(v => v > 0);
   const globalAvg = allRated.length ? allRated.reduce((a, b) => a + b, 0) / allRated.length : 0;
   const periodAvg = rated.length ? rated.reduce((s, x) => s + x.avg, 0) / rated.length : 0;
-  const top3 = [...rated].sort((a, b) => b.avg - a.avg || (b.item.elo || 1500) - (a.item.elo || 1500)).slice(0, 3);
+  const top3 = [...rated].sort((a, b) => b.avg - a.avg || (b.item.updated || 0) - (a.item.updated || 0)).slice(0, 3);
   const surprise = [...rated].filter(x => x.item.tmdbRating > 0).sort((a, b) => b.delta - a.delta)[0] || null;
   const letdown = [...rated].filter(x => x.item.tmdbRating > 0 && x.delta <= -1.0).sort((a, b) => a.delta - b.delta)[0] || null;
   const topGenreId = Object.entries(gMap).sort((a, b) => b[1] - a[1])[0]?.[0];
@@ -1387,10 +1352,10 @@ function renderWrappedTab() {
   state.stats.wrappedPeriod = w.periodKey;
 
   const bar = el('div', 'wrapped-controls');
-  const sw = el('div', 'game-source-switch');
+  const sw = el('div', 'seg-switch');
   sw.style.marginBottom = '0'; sw.style.flex = '1';
-  const mBtn = el('button', 'game-source-pill' + (w.mode === 'month' ? ' active' : ''), '📅 За місяць');
-  const yBtn = el('button', 'game-source-pill' + (w.mode === 'year' ? ' active' : ''), '🗓️ За рік');
+  const mBtn = el('button', 'seg-pill' + (w.mode === 'month' ? ' active' : ''), '📅 За місяць');
+  const yBtn = el('button', 'seg-pill' + (w.mode === 'year' ? ' active' : ''), '🗓️ За рік');
   mBtn.type = 'button'; yBtn.type = 'button';
   mBtn.onclick = () => { state.stats.wrappedMode = 'month'; state.stats.wrappedPeriod = null; renderStatistics(); };
   yBtn.onclick = () => { state.stats.wrappedMode = 'year'; state.stats.wrappedPeriod = null; renderStatistics(); };
@@ -1477,15 +1442,15 @@ function renderWrappedTab() {
 
   if (w.top3.length) {
     wrap.append(el('h3', 'label', '🏆 Топ-3 періоду'));
-    const lb = el('div', 'elo-lb');
+    const lb = el('div', 'rank-lb');
     w.top3.forEach((x, i) => {
-      const row = el('div', 'elo-row');
-      row.append(el('div', 'elo-rank', String(i + 1)));
-      if (x.item.poster) { const p = el('img', 'elo-poster'); p.src = TMDB_IMG + 'w92' + x.item.poster; p.loading = 'lazy'; row.append(p); }
-      const info = el('div', 'elo-info');
-      info.append(el('div', 'elo-title', x.item.title));
-      info.append(el('div', 'elo-games', (x.item.type === 'tv' ? 'Серіал' : 'Фільм') + (x.item.year ? ' · ' + x.item.year : '')));
-      row.append(info, el('div', 'elo-value top', fmtNum(x.avg)));
+      const row = el('div', 'rank-row');
+      row.append(el('div', 'rank-rank', String(i + 1)));
+      if (x.item.poster) { const p = el('img', 'rank-poster'); p.src = TMDB_IMG + 'w92' + x.item.poster; p.loading = 'lazy'; row.append(p); }
+      const info = el('div', 'rank-info');
+      info.append(el('div', 'rank-title', x.item.title));
+      info.append(el('div', 'rank-games', (x.item.type === 'tv' ? 'Серіал' : 'Фільм') + (x.item.year ? ' · ' + x.item.year : '')));
+      row.append(info, el('div', 'rank-value top', fmtNum(x.avg)));
       row.onclick = () => openCard(x.item);
       lb.append(row);
     });
@@ -1588,7 +1553,7 @@ function renderGenresTab() {
 function buildActivityHeatmap() {
   const counts = {};
   Object.values(lib).forEach(item => {
-    const ts = item.statusDate || (item.eloUpdated && item.updated === item.eloUpdated ? item.createdAt : (item.eloGames > 0 && item.createdAt ? item.createdAt : item.updated)) || item.createdAt;
+    const ts = item.statusDate || item.ratingUpdated || item.updated || item.createdAt;
     if (!ts) return;
     const d = new Date(ts);
     const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

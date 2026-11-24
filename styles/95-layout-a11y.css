@@ -205,14 +205,6 @@
     margin-right: 0;
   }
 
-  /* Сітка на 8 колонок */
-  body #results .home-grid {
-    display: grid;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-    gap: 20px 16px;
-    width: 100%;
-  }
-
   /* [LAYOUT] Блок «Для тебе» — окрема виділена панель із горизонтальною стрічкою. */
   .home-recs-panel {
     background: linear-gradient(135deg, rgba(var(--accent-rgb), .05), rgba(22, 20, 27, .55));
@@ -321,7 +313,7 @@ img {
   -webkit-user-select: none;
 }
 .rec-card, .item, .filmography-card, .similar-card, .actor-tile,
-.episode-poster-wrap, .franchise-head, .series-prog-row, .elo-row,
+.episode-poster-wrap, .franchise-head, .series-prog-row, .rank-row,
 .actor-rank-item, .nav-item, .nav-group-btn, .card-tab, .mood-pill,
 .recs-mode-pill, .home-tab, .filter-btn, button {
   -webkit-touch-callout: none;
@@ -342,4 +334,5 @@ html.mc-kbd .card-tab:focus-visible {
   outline-offset: -2px;
   border-radius: var(--r-sm);
 }
+
 

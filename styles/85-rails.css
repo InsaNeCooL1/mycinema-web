@@ -214,16 +214,13 @@
 .home-hero-inner.swap .home-hero-why { animation-delay: .1s; }
 .home-hero-inner.swap .home-hero-actions { animation-delay: .15s; }
 
-/* Поява гілок при скролі */
-.rail-section {
-  opacity: 0;
-  transform: translateY(22px);
-  transition: opacity .55s ease, transform .55s cubic-bezier(.2,.8,.2,1);
-}
+/* Полиці завжди видимі: анімація появи ламала швидкий скрол
+   (секції висіли opacity:0 і стрибкоподібно міняли висоту документа). */
+.rail-section { margin-bottom: 30px; }
 .rail-section.revealed { opacity: 1; transform: none; }
 
-/* Додатковий простір згори, щоб збільшена картка не обрізалась */
-.rail-strip { padding: 24px 2px 14px; margin-top: -12px; }
+/* Тримаємо реальну висоту полиці до заповнення, щоб скрол не «провалювався» */
+.rail-strip { min-height: 230px; padding: 24px 2px 14px; margin-top: -12px; }
 .rail-strip .rec-card {
   transform-origin: 50% 88%;
   transition: transform .32s cubic-bezier(.2,.8,.2,1), filter .32s ease;

@@ -22,11 +22,12 @@ const REC_BASE_SLOPE = 7.5;
 const REC_MODE_SHARE = 0.18; // режим впливає щонайбільше на 18% b
 
 // Ваги фінального скору (сума = 1.0), потім віднімаємо штраф anti.
-const REC_WEIGHTS = { base: 0.32, source: 0.26, profile: 0.22, elo: 0.08, mood: 0.12 };
+/* Замість Elo (0.08) — більша вага персонального профілю й настрою. */
+const REC_WEIGHTS = { base: 0.30, source: 0.28, profile: 0.28, mood: 0.14 };
 
 // Логістичні центри й крутизни для переведення сирих ознак у [0, 1].
-const REC_CENTERS = { base: 0.70, source: 1.40, profile: 1.00, elo: 0.50 };
-const REC_SLOPES  = { base: 10.0, source: 1.60, profile: 2.50, elo: 6.00 };
+const REC_CENTERS = { base: 0.70, source: 1.40, profile: 1.00 };
+const REC_SLOPES  = { base: 10.0, source: 1.60, profile: 2.50 };
 
 // moodBoost, який вважаємо «повним» впливом настрою.
 const REC_MOOD_FULL = 0.60;
@@ -121,12 +122,11 @@ function recRankScore(entry, jitter) {
     : recSigmoid(entry._baseRaw, REC_CENTERS.base, REC_SLOPES.base);
   const source  = recSigmoid(Math.min(entry._sourceRaw || 0, 3), REC_CENTERS.source, REC_SLOPES.source);
   const profile = recSigmoid(entry._profileRaw || 0, REC_CENTERS.profile, REC_SLOPES.profile);
-  const elo     = recSigmoid(entry._eloRaw || 0, REC_CENTERS.elo, REC_SLOPES.elo);
   const mood    = Math.max(0, Math.min(1, (entry._moodBoost || 0) / REC_MOOD_FULL));
   const w = REC_WEIGHTS;
   const score = w.base * base + w.source * source + w.profile * profile
-    + w.elo * elo + w.mood * mood - (entry._antiPenalty || 0);
-  return score + (Number(jitter) || 0);
+    + w.mood * mood - (entry._antiPenalty || 0);
+  return Math.max(0, Math.min(1, score + (Number(jitter) || 0)));
 }
 
 // Публічний API для home.js і тестів (classic script, без модулів).

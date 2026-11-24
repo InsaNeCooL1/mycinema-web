@@ -183,7 +183,7 @@
 .heatmap-cell.lvl-3 { background: rgba(var(--accent-rgb), .76); }
 .heatmap-cell.lvl-4 { background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb), .45); }
 
-.game-source-switch {
+.seg-switch {
   display: flex;
   gap: 6px;
   padding: 4px;
@@ -192,7 +192,7 @@
   border: 1px solid rgba(var(--white-rgb), .06);
   margin-bottom: 14px;
 }
-.game-source-pill {
+.seg-pill {
   flex: 1;
   padding: 9px 12px;
   border-radius: var(--r-sm);
@@ -201,8 +201,8 @@
   color: var(--text-muted);
   transition: .2s;
 }
-.game-source-pill:hover { color: var(--text); }
-.game-source-pill.active {
+.seg-pill:hover { color: var(--text); }
+.seg-pill.active {
   background: rgba(var(--accent-rgb), .18);
   color: var(--accent);
 }

@@ -263,7 +263,6 @@ function renderCalendar() {
   const itemTs = (x) => {
     if (x.statusDate) return x.statusDate;
     if (x.createdAt) return x.createdAt;
-    if (x.eloUpdated && (!x.status || x.status === 'none')) return 0;
     return x.updated || 0;
   };
   let allItems = Object.values(lib).filter(x => (x.status === 'watching' || x.status === 'watched') && itemTs(x) > 0);

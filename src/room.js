@@ -84,55 +84,15 @@
 
   function buildOnlineSettings() {
     var stInp = document.getElementById('streams-enable-toggle');
-    var netInp = document.getElementById('network-enable-toggle');
-    var inpUrl = document.getElementById('room-url');
-    if (!stInp || !netInp || !inpUrl || inpUrl.dataset.bound) return;
-    inpUrl.dataset.bound = '1';
-
+    if (!stInp || stInp.dataset.bound) return;
+    stInp.dataset.bound = '1';
     stInp.checked = settings.enableStreams !== false;
     stInp.addEventListener('change', function () {
       settings.enableStreams = !!this.checked;
       localStorage.setItem('mycinema.enableStreams', this.checked ? 'true' : 'false');
       if (typeof cardStack !== 'undefined' && cardStack.length && typeof renderCard === 'function') renderCard(true);
-      toast(this.checked ? '▶️ UA KINO увімкнено' : '🙈 UA KINO вимкнено');
+      toast(this.checked ? '▶️ Перегляд онлайн увімкнено' : '🙈 Перегляд онлайн вимкнено');
     });
-
-    netInp.checked = isNetworkEnabled();
-    netInp.addEventListener('change', function () {
-      setOnline({ networkEnabled: !!this.checked });
-      var fields = document.getElementById('online-network-fields');
-      if (fields) fields.hidden = !this.checked;
-      if (typeof cardStack !== 'undefined' && cardStack.length && typeof renderCard === 'function') renderCard(true);
-      toast(this.checked ? '🌐 Перегляд по мережі увімкнено' : '🙈 Перегляд по мережі вимкнено');
-    });
-
-    syncRoomFields();
-
-    var inpP = document.getElementById('room-parser-url');
-    var inpA = document.getElementById('room-parser-api');
-    var inpS = document.getElementById('room-server-url');
-    var st = document.getElementById('room-status');
-
-    document.getElementById('room-save').onclick = function () {
-      var raw = inpUrl.value.trim();
-      var n = raw ? normalizeUrl(raw) : DEFAULT_ROOM_URL;
-      if (!n) { st.textContent = '❌ Некоректний URL кімнати'; return; }
-      inpUrl.value = n;
-      setOnline({ roomUrl: n, parserUrl: inpP.value.trim(), parserApi: inpA.value.trim(), serverUrl: inpS.value.trim() });
-      st.textContent = '✅ Збережено';
-    };
-    document.getElementById('room-default').onclick = function () {
-      inpUrl.value = DEFAULT_ROOM_URL;
-      st.textContent = 'Підставлено стандартну адресу — натисніть «Зберегти»';
-    };
-    document.getElementById('room-check').onclick = function () {
-      var raw = inpUrl.value.trim();
-      var n = raw ? normalizeUrl(raw) : '';
-      if (!n) { st.textContent = 'URL кімнати порожній'; return; }
-      inpUrl.value = n;
-      st.textContent = 'Перевіряю кімнату...';
-      check(n).then(function (r) { st.textContent = r.ok ? '✅ Кімната відповідає' : '⚠️ Не відповідає (' + (r.error || '?') + ')'; });
-    };
   }
   function injectSettings() { buildOnlineSettings(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectSettings);

@@ -109,6 +109,19 @@ async function openStreamingProfile(ref) {
   renderCard();
 }
 
+async function loadStreamingForForward(ref) {
+  const hubId = resolveStreamingHub(ref);
+  const hub = (typeof STREAM_HUBS !== 'undefined' ? STREAM_HUBS : []).find(x => x.id === hubId);
+  if (!hub || hub.id === 'all') return;
+  const ctx = makeStreamingCtx(hubId);
+  ctx.hub = hub;
+  cardStack.push(ctx);
+  renderLoading();
+  await loadStreamingData(ctx);
+  if (cardStack[cardStack.length - 1] !== ctx) return;
+  renderCard(true);
+}
+
 async function loadStreamingData(ctx) {
   try {
     const [movies, shows] = await Promise.all([

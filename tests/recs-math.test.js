@@ -30,7 +30,7 @@ describe('Ранжування рекомендацій v2 (recs-math)', () => {
     const r = window.recRankScore;
     expect(Object.values(window.REC_WEIGHTS).reduce((a, b) => a + b, 0)).toBeCloseTo(1, 10);
 
-    const base = { _baseRaw: 0.8, _sourceRaw: 2, _profileRaw: 1.2, _eloRaw: 0.6, _moodBoost: 0.3, _antiPenalty: 0 };
+    const base = { _baseRaw: 0.8, _sourceRaw: 2, _profileRaw: 1.2, _moodBoost: 0.3, _antiPenalty: 0 };
     const withAnti = { ...base, _antiPenalty: 0.2 };
     expect(r(withAnti, 0)).toBeCloseTo(r(base, 0) - 0.2, 10);
     expect(r(base, 0.05)).toBeCloseTo(r(base, 0) + 0.05, 10);
@@ -38,14 +38,14 @@ describe('Ранжування рекомендацій v2 (recs-math)', () => {
 
   it('recRankScore: настрій враховано один раз і насичується', () => {
     const r = window.recRankScore;
-    const base = { _baseRaw: 0.8, _sourceRaw: 2, _profileRaw: 1.2, _eloRaw: 0.6, _antiPenalty: 0 };
+    const base = { _baseRaw: 0.8, _sourceRaw: 2, _profileRaw: 1.2, _antiPenalty: 0 };
     const noMood = r({ ...base, _moodBoost: 0 }, 0);
     const half = r({ ...base, _moodBoost: 0.3 }, 0);
     const full = r({ ...base, _moodBoost: 0.6 }, 0);
     const over = r({ ...base, _moodBoost: 6.0 }, 0);
 
-    expect(half - noMood).toBeCloseTo(0.12 * 0.5, 10);
-    expect(full - noMood).toBeCloseTo(0.12, 10);
+    expect(half - noMood).toBeCloseTo(0.14 * 0.5, 10);
+    expect(full - noMood).toBeCloseTo(0.14, 10);
     expect(over).toBeCloseTo(full, 10); // кап 1.0, жодного подвійного бонусу
   });
 
@@ -116,18 +116,26 @@ describe('Ранжування рекомендацій v2 (recs-math)', () => {
 
   it('recRankScore: бере _b, якщо він є (IMDb-шлях)', () => {
     const r = window.recRankScore;
-    const entry = { _baseRaw: 0.0, _b: 0.9, _sourceRaw: 0, _profileRaw: 0, _eloRaw: 0 };
+    const entry = { _baseRaw: 0.0, _b: 0.9, _sourceRaw: 0, _profileRaw: 0 };
     expect(r(entry, 0)).toBeGreaterThan(r({ ...entry, _b: 0.2 }, 0));
     expect(r({ ...entry, _b: 2 }, 0)).toBeCloseTo(r({ ...entry, _b: 1 }, 0), 10); // кап
   });
 
   it('recRankScore: скор абсолютний і не залежить від інших кандидатів', () => {
     const r = window.recRankScore;
-    const good = { _baseRaw: 0.85, _sourceRaw: 2.5, _profileRaw: 1.8, _eloRaw: 0.8 };
-    const weak = { _baseRaw: 0.55, _sourceRaw: 0.2, _profileRaw: 0.1, _eloRaw: 0.1 };
+    const good = { _baseRaw: 0.85, _sourceRaw: 2.5, _profileRaw: 1.8 };
+    const weak = { _baseRaw: 0.55, _sourceRaw: 0.2, _profileRaw: 0.1 };
     const a = r(good, 0);
     r(weak, 0); // наявність слабкого кандидата нічого не змінює
     expect(r(good, 0)).toBeCloseTo(a, 10);
     expect(a).toBeGreaterThan(r(weak, 0));
+  });
+
+  it('recRankScore: ваги без Elo, скор завжди в [0,1]', () => {
+    expect(window.REC_WEIGHTS.elo).toBeUndefined();
+    expect(Object.values(window.REC_WEIGHTS).reduce((a, b) => a + b, 0)).toBeCloseTo(1, 10);
+    const r = window.recRankScore;
+    expect(r({ _baseRaw: 0, _antiPenalty: 2 }, 0)).toBe(0);
+    expect(r({ _baseRaw: 100, _sourceRaw: 100, _profileRaw: 100 }, 1)).toBe(1);
   });
 });

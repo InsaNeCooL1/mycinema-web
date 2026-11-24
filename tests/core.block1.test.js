@@ -39,38 +39,15 @@ describe('Block 1 fixes & invariants', () => {
     expect(res[0].key).toBe('netflix');
   });
 
-  it('isTrackedInLib не вважає чистий Elo-запис без статусу/оцінки за переглянутий', () => {
+  it('isTrackedInLib не вважає запис без статусу/оцінки за переглянутий', () => {
     window.lib = {
-      'movie-1': { key: 'movie-1', type: 'movie', title: 'Elo Only', status: null, ratings: null, eloGames: 2 },
+      'movie-1': { key: 'movie-1', type: 'movie', title: 'Empty', status: null, ratings: null },
       'movie-2': { key: 'movie-2', type: 'movie', title: 'Planned', status: 'planned', ratings: null },
       'movie-3': { key: 'movie-3', type: 'movie', title: 'Fav', status: null, favorite: true }
     };
     expect(window.isTrackedInLib('movie-1')).toBe(false);
     expect(window.isTrackedInLib('movie-2')).toBe(true);
     expect(window.isTrackedInLib('movie-3')).toBe(true);
-  });
-
-  it('recordEloMatch зберігає стару дату оцінки й не зсуває аватар', () => {
-    const oldTs = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    const newTs = Date.now() - 1000;
-    window.lib = {
-      'movie-old': {
-        key: 'movie-old', type: 'movie', title: 'Old Great',
-        status: 'watched', ratings: { overall: 9 }, updated: oldTs, createdAt: oldTs
-      },
-      'movie-new': {
-        key: 'movie-new', type: 'movie', title: 'Fresh Mid',
-        status: 'watched', ratings: { overall: 6 }, updated: newTs, createdAt: newTs
-      }
-    };
-
-    window.recordEloMatch(window.lib['movie-old'], window.lib['movie-new']);
-
-    expect(window.lib['movie-old'].ratingUpdated).toBe(oldTs);
-    expect(window.lib['movie-old'].statusDate).toBe(oldTs);
-    const ordered = window.getLastRatedProjects(10);
-    expect(ordered[0].key).toBe('movie-new');
-    expect(ordered[1].key).toBe('movie-old');
   });
 
   it('TorrServer має адресу за замовчуванням', () => {

@@ -2,7 +2,7 @@
 
 Стрічка «Рекомендації» формується з бібліотеки користувача, каталогу TMDB і рейтингів IMDb.
 
-- **Локальна бібліотека** (`lib`) — оцінки, статуси, ❤️, ELO, акторські корекції, виключення з профілю.
+- **Локальна бібліотека** (`lib`) — оцінки, статуси, ❤️, повторні перегляди, акторські корекції, виключення з профілю.
 - **TMDB** — каталог: постери, назви, жанри, актори, ключові слова, колекції, discover, дати релізу, провайдери UA.
 - **IMDb** — рейтинг, кількість голосів і залишок (residual). Клієнт отримує їх пакетом `POST /imdb/batch` із Cloudflare Worker (MDBList) і кешує на 7 днів.
 
@@ -80,13 +80,13 @@ T_c = \frac{\sum_i w_i\, r_{i,c}}{\sum_i w_i}
 
 ## 4. Сіди
 
-Кандидат у сіди: `avg ≥ 6.5`, або ❤️, або (`eloGames > 0` і `elo ≥ 1530`). Тайтл виключається, якщо `excludeFromProfile === true`, або (за відсутності явного прапорця) якщо `|avg − r_IMDb| > 3`.
+Кандидат у сіди: `avg ≥ 6.5`, або ❤️, або повторний перегляд / 2+ реакції 😍 на серії. Тайтл виключається, якщо `excludeFromProfile === true`, або (за відсутності явного прапорця) якщо `|avg − r_IMDb| > 3`.
 
 ```
 base      = avg  (або 8.6 якщо ❤️ без оцінки, 8.2 інакше)
 favBonus  = 1.2 · [favorite]
-eloBonus  = min((elo − 1500)/100, 1.5)  при elo > 1500
-strength  = min(10, base + favBonus + eloBonus)
+rewatchBonus = min(1.5, rewatches·0.5 + min(😍,3)·0.25)
+strength  = min(10, base + favBonus + rewatchBonus)
 
 residual  = avg − r_IMDb   (або avg − r_TMDB, або avg − 6.9/7.6)
 resFactor = clamp(1 + residual/2, 0.3, 2)
@@ -225,11 +225,9 @@ S_{\text{cast}}=\max(S_{\text{cast}},\ \min(2.2,\ 0.95\,\text{recSignal}))
 
 Фільтри кандидатів: наявність постера, не в бібліотеці, не схований, не в майбутньому релізі при `digitalOnly`/`streamingOnlyUA`.
 
-ELO сіду, якщо є ігри, дає внесок у `_eloHits`:
+Повторні перегляди та реакції 😍 посилюють сигнал сіду:
 
 \[
-\text{eloHit}=\mathrm{clamp}\!\left(\frac{elo-1450}{250},0,1\right),\qquad
-\text{eloRaw}=\text{mean}(\text{eloHits})
 \]
 
 ---
@@ -352,7 +350,6 @@ antiPenalty   = antiGenre + min(0.4, antiDir) + min(0.35, antiKw) + min(0.35, an
 | база | `WR`, `modeBonus` | 0.71 movie / 0.77 tv | 7.5 | `b` (див. 9.1) |
 | джерело | `min(sourceRaw, 3)` | 1.40 | 1.6 | `s` |
 | профіль | `profileRaw` | 1.00 | 2.5 | `p` |
-| ELO | `eloRaw` | 0.50 | 6.0 | `e` |
 | настрій | `moodBoost / 0.60` | — | — | `m = clamp(·, 0, 1)` |
 
 ### 9.4 Підсумкова формула
@@ -394,12 +391,12 @@ antiPenalty   = antiGenre + min(0.4, antiDir) + min(0.35, antiKw) + min(0.35, an
 | IMDb-рейтинги | 7 днів | `mycinema.imdbRatings.v1` |
 | Метадані (`credits`, `keywords`) | 7 днів, 220 записів | `mycinema.metaCache.v2` |
 | Загальні добірки | 12 год | `mycinema.home.general.v7` |
-| Рекомендації | 48 год | `mycinema.recs.v5` |
+| Рекомендації | 48 год | `mycinema.recs.v7` |
 
 Підпис рекомендацій:
 
 ```
-v15-imdb | дата | nonce | сіди(strength,resFactor) | антисіди | виключення |
+v17-rails | дата | nonce | сіди(strength,resFactor) | антисіди | виключення |
 акторські корекції | сума акторських оцінок | настрій(weight) | режим |
 digitalOnly | streamingOnlyUA
 ```
@@ -410,7 +407,7 @@ digitalOnly | streamingOnlyUA
 
 ## 11. Практичний приклад
 
-Кандидат (movie): IMDb `8.8` при `15 000` голосах, популярність `120`, 2 recommendation-сіди, `genreMatch = 0.80`, актор `0.30`, режисер `0.20`, keyword `0.12`, `eloRaw = 0.7`, `moodBoost = 0.18`, `antiPenalty = 0.05`.
+Кандидат (movie): IMDb `8.8` при `15 000` голосах, популярність `120`, 2 recommendation-сіди, `genreMatch = 0.80`, актор `0.30`, режисер `0.20`, keyword `0.12`, `moodBoost = 0.18`, `antiPenalty = 0.05`.
 
 1. **Байєс:** `WR = (15000·0.88 + 2000·0.63)/17000 ≈ 0.8506`.
 2. **balance:** `log₁₀(15001) ≈ 4.176 → 0.2·(4.176−2)/4 ≈ 0.1088`; `popularity` додає `0.05·(120/250) = 0.024`. `modeBonus ≈ 0.1328`, `baseRaw ≈ 0.9834`.

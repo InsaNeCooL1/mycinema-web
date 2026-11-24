@@ -126,8 +126,9 @@ body:not(.mc-search-open):not(.no-search) { padding-top: 68px; }
 .mood-chip-delta { font-size: 10.5px; font-weight: 600; color: rgb(var(--mood-rgb)); }
 
 #sidebar .sidebar-nav .nav-item[data-tab="home"],
-#sidebar .sidebar-nav .nav-item[data-tab="statistics"],
-#sidebar .sidebar-nav .nav-more-group { display: none !important; }
+#sidebar .sidebar-nav .nav-item[data-tab="statistics"] { display: none !important; }
+/* .nav-more-group керується інлайн у initPriorityNav(): прибраний !important
+   повертає пункти, перенесені в «Ще» на ширинах 768–1099px. */
 
 /* Пошук — окремий острівець перед навігацією */
 .search-island {
@@ -287,8 +288,7 @@ body:not(.mc-search-open):not(.no-search) { padding-top: 68px; }
 }
 @media (max-width: 1050px) {
   .utility-dock #sidebar-login-btn,
-  .utility-dock #sidebar-logout-btn,
-  .top-island { display: none; }
+  .utility-dock #sidebar-logout-btn { display: none; }
   .mood-chip-label, .mood-chip-delta { display: none; }
   .taste-top-btn.mood-chip { min-width: 0; padding: 4px 10px 4px 5px; gap: 6px; }
   .taste-top-avatar.mood-chip-avatar { width: 28px; height: 28px; }

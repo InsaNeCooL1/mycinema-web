@@ -33,6 +33,7 @@ function refreshHeroInPlace(ctx) {
   const cur = card.querySelector('.mobile-hero');
   if (cur && window.MC?.createHero) {
     cur.replaceWith(MC.createHero(ctx));
+    if (typeof window.attachMobHeroFloats === 'function') window.attachMobHeroFloats();
   } else {
     renderCard(true);
   }
@@ -96,7 +97,16 @@ function refreshCardControlsInPlace(ctx) {
     if (curSt) curSt.replaceWith(MC.createStatuses(ctx));
 
     const curScore = Array.from(card.querySelectorAll('.mobile-score')).find(el => !el.closest('.mobile-tabs-wrap'));
-    if (curScore) curScore.replaceWith(MC.createScoreBlock(ctx));
+    if (curScore) {
+      const wasCollapsed = curScore.classList.contains('collapsed');
+      const newScore = r.type === 'tv' && typeof MC.createTvScoreBlock === 'function'
+        ? MC.createTvScoreBlock(ctx)
+        : MC.createScoreBlock(ctx);
+      if (wasCollapsed && !newScore.classList.contains('collapsed')) newScore.classList.add('collapsed');
+      curScore.replaceWith(newScore);
+      /* повторно навішуємо мобільні флоати та клік по згорнуту оцінку */
+      if (typeof window.attachMobHeroFloats === 'function') window.attachMobHeroFloats();
+    }
   }
 
   // 4. Таби оновлюємо лише якщо активна вкладка залежить від стану (сезони або нотатки)
@@ -119,6 +129,7 @@ function _mcRestorePageScroll() {
 
 async function openCard(r) {
   if (cardStack.length) return openMediaFromStack(r);
+  if (typeof window.markRecOpened === 'function' && r && r.key) window.markRecOpened(r.key);
   _libDirtySinceCardOpen = false;
   _mcSavePageScroll();
   overlay.classList.add("open");
@@ -356,13 +367,17 @@ window.addEventListener('popstate', async (e) => {
   if (depth > cardStack.length) {
     const s = e.state;
     if (!s || !s.ctx || depth - cardStack.length > 1) {
-      const h = s?.ctx ? (s.ctx.type === 'person' ? '#/person/' + s.ctx.id : (s.ctx.type === 'company' ? '#/company/' + s.ctx.id : '#/' + s.ctx.media_type + '/' + s.ctx.id)) : '';
+      const h = s?.ctx ? (s.ctx.type === 'person' ? '#/person/' + s.ctx.id
+        : (s.ctx.type === 'company' ? '#/company/' + s.ctx.id
+        : (s.ctx.type === 'streaming' ? '#/streaming/' + s.ctx.id
+        : '#/' + (s.ctx.media_type || s.ctx.item?.type) + '/' + s.ctx.id))) : '';
       location.hash = h;
       location.reload();
       return;
     }
     if (s.ctx.type === 'person') await loadPersonForForward(s.ctx.id);
     else if (s.ctx.type === 'company') await loadCompanyForForward(s.ctx.id);
+    else if (s.ctx.type === 'streaming' && typeof loadStreamingForForward === 'function') await loadStreamingForForward(s.ctx.id);
     else if (s.ctx.type === 'media') await loadMediaForForward(s.ctx);
     return;
   }
@@ -403,7 +418,8 @@ function renderCard(restore) {
   if (ctx.type === 'media') {
     const glowPath = ctx.item?.backdrop || ctx.details?.backdrop_path || ctx.item?.poster || ctx.details?.poster_path;
     if (glowPath) {
-      const glow = el('div', 'card-ambient-glow');
+      const glow = el('div', 'card-ambient-glow' +
+        (typeof settings !== 'undefined' && settings.posterBg ? ' card-poster-bg' : ''));
       glow.style.backgroundImage = `url("${TMDB_IMG}w780${glowPath}")`;
       card.append(glow);
     }
@@ -552,10 +568,9 @@ function updateCore(r, patch) {
   const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
   const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
   const hasNotes = (lib[r.key].notes && lib[r.key].notes.trim()) || (lib[r.key].notesHistory && lib[r.key].notesHistory.length > 0);
-  const hasElo = lib[r.key].eloGames && lib[r.key].eloGames > 0;
   const hasFav = lib[r.key].favorite === true;
   const hasTasteFlags = lib[r.key].excludeFromProfile !== undefined || lib[r.key].antiSeed === true;
-  if (!lib[r.key].status && !hasR && !hasSR && !hasEps && !hasNotes && !hasElo && !hasFav && !hasTasteFlags) removeLibItem(r.key);
+  if (!lib[r.key].status && !hasR && !hasSR && !hasEps && !hasNotes && !hasFav && !hasTasteFlags) removeLibItem(r.key);
   save();
 }
 function update(r, patch) {

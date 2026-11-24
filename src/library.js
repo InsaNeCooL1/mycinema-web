@@ -2,12 +2,9 @@
 
 // ========== MY TOP ==========
 function renderMyTop() {
-  box.style.padding = '0 16px 16px';
   box.replaceChildren();
 
   const head = el('div', 'section-head');
-  head.style.marginTop = '20px';
-  head.style.alignItems = 'center';
   head.append(el('h1', 'section-title', '🏆 Мій топ'));
   const shareBtn = el('button', 'obs-share-btn', '📤 Поділитися');
   shareBtn.type = 'button';
@@ -18,32 +15,26 @@ function renderMyTop() {
   box.append(head);
 
   const filterBar = el('div', 'filter-bar');
-  filterBar.style.margin = '0 0 16px 0';
-  filterBar.style.padding = '0';
   const filters = [
     { id: 'all', label: 'Всі' },
     { id: 'movie', label: '🎬 Фільми' },
     { id: 'tv', label: '📺 Серіали' }
   ];
   filters.forEach(f => {
-    const btn = el('button', 'filter-btn' + (state.topTypeFilter === f.id ? ' active' : ''), f.label);
-    btn.addEventListener('click', () => {
-      state.topTypeFilter = f.id;
-      renderMyTop();
-    });
+    const btn = el('button', 'filter-btn' + (state.typeFilter === f.id ? ' active' : ''), f.label);
+    btn.type = 'button';
+    btn.dataset.filter = f.id;
     filterBar.append(btn);
   });
   box.append(filterBar);
 
   let rated = Object.values(lib).map(x => ({ item: x, r: computeItemRating(x) })).filter(x => x.r.avg > 0);
-  if (state.topTypeFilter !== 'all') {
-    rated = rated.filter(x => x.item.type === state.topTypeFilter);
+  if (state.typeFilter !== 'all') {
+    rated = rated.filter(x => x.item.type === state.typeFilter);
   }
   rated.sort((a, b) => {
     const diff = b.r.avg - a.r.avg;
     if (Math.abs(diff) > 0.001) return diff;
-    const eloDiff = (b.item.elo || ELO_START) - (a.item.elo || ELO_START);
-    if (eloDiff !== 0) return eloDiff;
     return (b.item.updated || 0) - (a.item.updated || 0);
   });
 
@@ -102,8 +93,11 @@ function renderLibraryItems() {
 }
 
 function renderLibrary() {
-  box.style.padding = '0 16px 16px';
   box.replaceChildren();
+  const listTitles = { watching: '▶️ Дивлюсь', watched: '✅ Переглянуто', planned: '📅 Планую', dropped: '🕸️ Закинуто', favorites: '❤️ Улюблене' };
+  const head = el('div', 'section-head');
+  head.append(el('h1', 'section-title', listTitles[state.tab] || '📚 Списки'));
+  box.append(head);
 
   const searchInp = document.createElement('input');
   searchInp.type = 'search';
@@ -150,8 +144,10 @@ function renderLibrary() {
 }
 
 function renderNotesList() {
-  box.style.padding = '0 16px 16px';
   box.replaceChildren();
+  const head = el('div', 'section-head');
+  head.append(el('h1', 'section-title', '📝 Нотатки'));
+  box.append(head);
 
   const allNotes = [];
   
@@ -172,7 +168,7 @@ function renderNotesList() {
   allNotes.sort((a, b) => b.ts - a.ts);
 
   if (!allNotes.length) {
-    box.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Тут поки немає нотаток. Відкрий тайтл і натисни «Додати нотатку».</div>';
+    box.append(el('div', 'avail-empty', 'Тут поки немає нотаток. Відкрий тайтл і натисни «Додати нотатку».'));
     return;
   }
 
@@ -257,9 +253,6 @@ function createListItem(r, showNumber, number) {
       const labels = { watched: "✅", planned: "📅", watching: "▶️", dropped: "🕸️" };
       info.append(el("span", "badge", labels[saved.status] || ""));
     }
-    if (saved.elo && saved.eloGames > 1) {
-      info.append(el("span", "badge elo", `🏆 ${saved.elo}`));
-    }
     if (saved.rewatches > 0) {
       info.append(el("span", "badge rewatch", `🔁 ×${saved.rewatches + 1}`));
     }
@@ -341,11 +334,10 @@ function removeFromLibrary(key) {
   const hasR = saved.ratings && Object.values(saved.ratings).some(v => v > 0);
   const hasSR = saved.seasonRatings && Object.keys(saved.seasonRatings).length > 0;
   const hasNotes = (saved.notes && saved.notes.trim()) || (saved.notesHistory && saved.notesHistory.length > 0);
-  const hasElo = saved.eloGames && saved.eloGames > 0;
   const hasFav = saved.favorite === true;
   const hasEps = saved.watchedEpisodes && saved.watchedEpisodes.length > 0;
   const hasTasteFlags = saved.excludeFromProfile !== undefined || saved.antiSeed === true;
-  if (hasR || hasSR || hasNotes || hasElo || hasFav || hasEps || hasTasteFlags) {
+  if (hasR || hasSR || hasNotes || hasFav || hasEps || hasTasteFlags) {
     lib[key].status = null;
     lib[key].updated = Date.now();
     _dirtyItems.add(key); /* SYNC-FIX-REMOVE-LIB */

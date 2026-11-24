@@ -29,7 +29,7 @@
     play: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5v14l11-7z"/></svg>',
     check: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
     calendar: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4"/><path d="M16 2v4"/><path d="M3 10h18"/><path d="M8 14h4"/><path d="M12 14h4"/></svg>',
-    crown: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L9 8 3 8.5 12 14l5-5.5L21 8 12 2z"/></svg>',
+    trophy: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>',
     eye: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
     sync: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4v6h-6"/><path d="M3 18v-6h6"/><path d="M3 9a7 7 0 0 1 14-3l-3.5 3.5"/><path d="M21 15a7 7 0 0 1-14 3l3.5-3.5"/></svg>',
     gear: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.8l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.83-.33 1.65 1.65 0 0 0-1.17 1.52V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-.82-.33 1.65 1.65 0 0 0-1.51 1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
@@ -63,6 +63,7 @@
     TOP_LOGO.textContent = hasCard ? '← Назад' : 'MyCinema';
     TOP_LOGO.classList.toggle('mob-top-back', hasCard);
   }
+  window.syncMobTop = syncMobTop;
   if (TOP_LOGO) {
     TOP_LOGO.addEventListener('click', () => {
       if (cardStack.length) {
@@ -212,10 +213,10 @@
   function openMobMoreSheet() {
     mobSheet('Меню/Ще', (body) => {
       body.append(mobSheetItem('Календар', MV.calendar, () => { mobSheetClose(); setTab('calendar'); }));
-      body.append(mobSheetItem('Цар гори', MV.crown, () => { mobSheetClose(); setTab('top'); }));
+      body.append(mobSheetItem('Мій топ', MV.trophy, () => { mobSheetClose(); setTab('top'); }));
       body.append(mobSheetItem('Обсерваторія', MV.eye, () => { mobSheetClose(); setTab('statistics'); }));
-      body.append(mobSheetItem('Синхронізація', MV.sync, () => { mobSheetClose(); syncFromSettings(); }));
       body.append(mobSheetItem('Налаштування', MV.gear, () => { mobSheetClose(); setTab('settings'); }));
+      body.append(mobSheetItem('Синхронізація', MV.sync, () => { mobSheetClose(); syncFromSettings(); }));
     });
   }
 
@@ -325,7 +326,11 @@
             const poster = el('div', 'mob-search-card-poster');
             if (row.poster) { const img = el('img'); img.src = TMDB_IMG + 'w185' + row.poster; poster.append(img); }
             b.append(poster, el('div', 'mob-search-card-info', `${row.label}\n${row.meta}`));
-            b.onclick = () => { if (typeof addToHistory === 'function') addToHistory(input.value); row.onClick(); };
+            b.onclick = () => {
+              if (typeof addToHistory === 'function') addToHistory(input.value);
+              closeMobSearch(); /* інакше картка відкриється під пошуком (z-index 1101 > 1100) */
+              row.onClick();
+            };
             results.append(b);
           });
           if (!results.children.length) results.append(el('div', 'mob-search-item mob-search-empty', 'Нічого не знайдено'));
@@ -385,6 +390,8 @@
       const st = card.querySelector('.mobile-statuses');
       if (st) st.remove();
     };
+    /* Використовується карткою після in-place оновлень (hero / score) */
+    window.attachMobHeroFloats = attach;
     const after = (r) => { attach(); syncMobTop(); return r; };
     const _rc = window.renderCard;
     window.renderCard = function (restore) {
@@ -422,7 +429,8 @@
   document.addEventListener('click', (e) => {
     if (!isMobShell()) return;
     const btn = e.target.closest('.filter-btn');
-    if (btn) {
+    /* Власні фільтри сторінок (Мій топ тощо) мають працювати без мобільного шита */
+    if (btn && btn.closest('#type-filter')) {
       e.preventDefault();
       e.stopImmediatePropagation();
       openMobFiltersSheet();

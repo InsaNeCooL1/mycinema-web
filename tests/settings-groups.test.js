@@ -42,19 +42,4 @@ describe('Налаштування — меню з 4 груп', () => {
     expect(css).toMatch(/\.settings-modal\.open\s*\{\s*display:\s*flex/);
   });
 
-  it('перемикач «по мережі» показує й ховає поля парсеру та сервера', () => {
-    openSettingsGroup('online');
-    const toggle = document.getElementById('network-enable-toggle');
-    const fields = document.getElementById('online-network-fields');
-    expect(toggle).toBeTruthy();
-    expect(fields.hidden).toBe(true);
-
-    toggle.checked = true;
-    toggle.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(fields.hidden).toBe(false);
-
-    toggle.checked = false;
-    toggle.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(fields.hidden).toBe(true);
-  });
 });

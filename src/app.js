@@ -73,8 +73,7 @@ function setTab(t, opts) {
   box.classList.remove('tab-entering');
   void box.offsetWidth;
   box.classList.add('tab-entering');
-  if (t === 'game') { box.style.padding = '0'; renderGame(); return; }
-  if (t === 'top') { box.style.padding = '0 16px 16px'; renderMyTop(); return; }
+  if (t === 'top') { renderMyTop(); return; }
   refresh();
 }
 
@@ -91,12 +90,19 @@ function toggleObservatory() {
   }
 }
 
-document.querySelectorAll(".filter-btn").forEach(b => b.addEventListener("click", () => setTypeFilter(b.dataset.filter)));
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest && e.target.closest(".filter-btn[data-filter]");
+  if (btn) setTypeFilter(btn.dataset.filter);
+});
 
 function setTypeFilter(f) {
   state.typeFilter = f;
-  document.querySelectorAll(".filter-btn").forEach(b => b.classList.toggle("active", b.dataset.filter === f));
-  if (state.tab === "filter") renderFilter(); else renderLibrary();
+  state.topTypeFilter = f;
+  document.querySelectorAll(".filter-btn[data-filter]").forEach(b => b.classList.toggle("active", b.dataset.filter === f));
+  if (state.tab === "filter") renderFilter();
+  else if (state.tab === "top") renderMyTop();
+  else if (state.tab === "notes") renderNotesList();
+  else renderLibrary();
 }
 
 (function initHeaderScroll() {
@@ -110,7 +116,6 @@ function refresh() {
   else if (state.tab === "streamings") renderStreamings();
   else if (state.tab === "settings") renderSettingsPage();
   else if (state.tab === "filter") renderFilter();
-  else if (state.tab === "game") renderGame();
   else if (state.tab === "statistics") renderStatistics();
   else if (state.tab === "notes") renderNotesList();
   else if (state.tab === "calendar") renderCalendar();
@@ -135,6 +140,7 @@ history.replaceState({ mc: 0 }, '', location.pathname + location.search + _initi
     booted = true;
     /* [LAYOUT] Верхній блок «Твій смак» має дані й на інших стартових вкладках. */
     if (typeof updateTopTasteButton === 'function') updateTopTasteButton();
+    if (typeof migrateLegacyElo === 'function') migrateLegacyElo();
     refresh();
     if (_initialHash) routeFromHash();
   }

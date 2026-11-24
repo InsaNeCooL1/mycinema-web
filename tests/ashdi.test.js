@@ -70,8 +70,9 @@ describe('Ashdi provider (адаптація makhno_snack)', () => {
 
   it('резолвить /vod/ у плоский список з multivoice і виправляє субтитри', async () => {
     global.fetch = vi.fn((u) => {
-      const url = proxiedUrl(u);
-      expect(url).toContain('multivoice');
+      /* Сторінка плеєра йде через Jina — IP воркера Ashdi геоблокує. */
+      expect(String(u)).toContain('r.jina.ai/');
+      expect(String(u)).toContain('multivoice');
       return Promise.resolve({ ok: true, text: () => Promise.resolve(VOD_HTML) });
     });
     const flat = await window._streamsUtil.resolveAshdi({ href: 'https://ashdi.vip/vod/777' });

@@ -21,7 +21,7 @@
     if (opts.body) init.body = opts.body;
     if (ctrl) init.signal = ctrl.signal;
     return fetch(getProxy() + '?' + parts.join('&'), init).then(function (r) {
-      if (!r.ok) throw new Error('Проксі HTTP ' + r.status);
+      if (!r.ok && !(opts.allow404 && r.status === 404)) throw new Error('Проксі HTTP ' + r.status);
       return r.text();
     }).finally(function () { if (tmr) clearTimeout(tmr); });
   }
@@ -187,10 +187,13 @@
     if (!m3u8Url || typeof m3u8Url !== 'string') return Promise.resolve([]);
     if (qualCache[m3u8Url]) return Promise.resolve(qualCache[m3u8Url]);
     var base = m3u8Url.substring(0, m3u8Url.lastIndexOf('/') + 1);
-    return fetch(m3u8Url).then(function (r) {
-      if (!r.ok) return [];
-      return r.text();
-    }).then(function (text) {
+    /* calypso.tortuga.tw віддає ACAO:* — воркер його не бере (403), тому
+       одразу йдемо напряму, без зайвої помилки в консолі. */
+    var directFetch = fetch(m3u8Url).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); });
+    var loadPlaylist = /^https?:\/\/(?:[^/?#]*\.)?tortuga\.tw\//i.test(m3u8Url)
+      ? directFetch
+      : (typeof px === 'function' ? px(m3u8Url).catch(function () { return directFetch; }) : directFetch);
+    return loadPlaylist.then(function (text) {
       var v = parseMaster(text, base);
       qualCache[m3u8Url] = v;
       return v;
@@ -219,7 +222,8 @@
             url: q.url || x.url,
             subtitle: x.subtitle || '',
             audioLang: x.audioLang || '',
-            proxy: !!(x.mcProxy || x.proxy)
+            proxy: !!(x.mcProxy || x.proxy),
+            iframeFallback: x.fallbackIframeUrl || ''
           });
         });
       });
@@ -306,7 +310,7 @@
     });
     return tree;
   }
-  function lookupAshdi(imdbId, tmdbId, type) {
+  function lookupAshdi(imdbId, tmdbId, type, title) {
     var imdb = /^tt\d{5,10}$/.test(String(imdbId || '').trim()) ? String(imdbId).trim() : '';
     var tmdb = /^\d+$/.test(String(tmdbId || '').trim()) ? String(tmdbId).trim() : '';
     if (!imdb && !tmdb) return Promise.resolve('');
@@ -330,8 +334,20 @@
       try { j = JSON.parse(raw.trim()); } catch (e) {}
       var play = j && typeof j.play === 'string' ? j.play.trim() : '';
       if (!isAshdiPlayer(play)) play = '';
-      whCache[ck] = { play: play, until: Date.now() + (play ? 86400000 : 3600000) };
-      return play;
+      if (play) return play;
+      /* WH не знає цей ID — шукаємо за назвою на сайті Ashdi через Jina. */
+      var q = String(title || '').trim();
+      if (!q) return '';
+      var searchUrl = 'https://ashdi.vip/?do=search&subaction=search&story=' + encodeURIComponent(q);
+      return jinaPx(searchUrl).then(function (html) {
+        var m = /(?:https?:\/\/)?(?:www\.)?(?:ashdi\.vip|sniplyo\.online|creavio\.online)?\/(vod|serial)\/(\d+)/i.exec(String(html || ''));
+        if (!m) return '';
+        var found = 'https://ashdi.vip/' + m[1] + '/' + m[2];
+        return isAshdiPlayer(found) ? found : '';
+      }).catch(function () { return ''; });
+    }).then(function (play) {
+      whCache[ck] = { play: play || '', until: Date.now() + (play ? 86400000 : 3600000) };
+      return play || '';
     }).catch(function () { return ''; });
   }
   function resolveAshdi(cand) {
@@ -339,7 +355,10 @@
     var href = cand.href;
     var ask = (/\/vod\//i.test(href) && !/multivoice/i.test(href))
       ? href + (href.indexOf('?') >= 0 ? '&' : '?') + 'multivoice' : href;
-    return px(ask, { referer: ashdiOrigin(href) + '/' }).then(function (html) {
+    /* Ashdi геоблокує IP воркера й віддає «Змініть країну перегляду» замість
+       плеєра. Jina читає ту саму сторінку зі свого діапазону — конфіг лишається
+       повний, а медіа нижче йдуть через воркер (там геоблоку немає). */
+    return jinaPx(ask).then(function (html) {
       var tree = parseAshdiHtml(html);
       if (!tree) throw new Error('Ashdi: плеєр не віддав джерела');
       tagAshdiTree(tree);
@@ -354,312 +373,6 @@
       });
       detailCache[href] = flat;
       return flat;
-    });
-  }
-
-  /* ─── Filmix (mobile API v2) ────────────────────────────────────────────
-     Усі запити через CF-воркер: він ставить okhttp/3.10.0 і прибирає
-     браузерні Origin/Referer для filmixapp.cyou. */
-  var FM_HTTP = 'http://filmixapp.cyou/api/v2';
-  var FM_HTTPS = 'https://filmixapp.cyou/api/v2';
-  var FM_K = { dev: 'mycinema.filmix.devId', token: 'mycinema.filmix.token',
-    pending: 'mycinema.filmix.pending', pendingCode: 'mycinema.filmix.pendingUserCode',
-    map: 'mycinema.filmix.map' };
-  function fmGet(k, d) { try { var v = localStorage.getItem(k); return v === null || v === undefined ? d : v; } catch (e) { return d; } }
-  function fmSet(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
-  function fmDevId() {
-    var id = fmGet(FM_K.dev, '');
-    if (!/^[0-9a-f]{16}$/i.test(id)) {
-      id = '';
-      for (var i = 0; i < 16; i++) id += Math.floor(Math.random() * 16).toString(16);
-      fmSet(FM_K.dev, id);
-    }
-    return id;
-  }
-  function fmToken() { return fmGet(FM_K.token, ''); }
-  function fmSetToken(t) { fmSet(FM_K.token, t || ''); }
-  function fmParams() {
-    return 'user_dev_id=' + encodeURIComponent(fmDevId()) +
-      '&user_dev_name=Xiaomi&user_dev_vendor=Xiaomi&user_dev_os=14' +
-      '&user_dev_apk=2.2.0&app_lang=ru-rRU' +
-      '&user_dev_token=' + encodeURIComponent(fmToken());
-  }
-  function fmApi(path, opts, tokenOverride) {
-    var sep = path.indexOf('?') >= 0 ? '&' : '?';
-    var tail = sep + fmParams().replace(/user_dev_token=[^&]*/,
-      'user_dev_token=' + encodeURIComponent(tokenOverride === undefined ? fmToken() : tokenOverride));
-    return px(FM_HTTP + '/' + path + tail, opts)
-      .catch(function () { return px(FM_HTTPS + '/' + path + tail, opts); })
-      .then(function (text) {
-        var j = null;
-        try { j = JSON.parse(text); } catch (e) { throw new Error('Filmix: невалідна відповідь'); }
-        if (j && (j.error || j.status === 'error')) {
-          throw new Error(j.error_message || j.error || 'Filmix API error');
-        }
-        return j;
-      });
-  }
-  function filmixTokenRequest() {
-    return fmApi('token_request').then(function (j) {
-      /* Lampa: саме поле code є тимчасовим токеном пристрою.
-         Повторний token_request створює НОВИЙ код — його не можна використовувати
-         для опитування активації. */
-      var tok = String((j && j.code) || (j && j.user_dev_token) || '');
-      return {
-        user_code: String((j && j.user_code) || ''),
-        code: tok, user_dev_token: tok, tempToken: tok
-      };
-    });
-  }
-  function filmixDeviceStart() {
-    return filmixTokenRequest().then(function (p) {
-      if (p.code) fmSet(FM_K.pending, p.code);
-      if (p.user_code) fmSet(FM_K.pendingCode, p.user_code);
-      return { user_code: p.user_code, code: p.code };
-    });
-  }
-  function filmixDeviceCheck() {
-    var pending = fmGet(FM_K.pending, '');
-    var userCode = fmGet(FM_K.pendingCode, '');
-    if (!pending) return Promise.resolve({ activated: false, user_code: userCode });
-    /* Після вводу user_code на сайті постійний токен = той самий code.
-       Перевіряємо через user_profile — успішна відповідь означає активацію. */
-    return fmApi('user_profile', null, pending).then(function (j) {
-      if (j && j.user_data) {
-        fmSetToken(pending);
-        fmSet(FM_K.pending, '');
-        fmSet(FM_K.pendingCode, '');
-        fmProfileCache = {
-          v: j.user_data.is_pro_plus === true ? 2160 : (j.user_data.is_pro === true ? 1080 : 720),
-          ts: Date.now()
-        };
-        return { activated: true, token: pending };
-      }
-      return { activated: false, user_code: userCode };
-    }).catch(function () { return { activated: false, user_code: userCode }; });
-  }
-  var fmStore = {};
-  function fmCached(key, ttl, fn) {
-    var hit = fmStore[key];
-    if (hit && Date.now() < hit.until) return Promise.resolve(hit.v);
-    return Promise.resolve().then(fn).then(function (v) {
-      fmStore[key] = { v: v, until: Date.now() + ttl };
-      return v;
-    });
-  }
-  var fmProfileCache = { v: null, ts: 0 };
-  function filmixMaxQuality() {
-    if (!fmToken()) return Promise.resolve(480);
-    if (fmProfileCache.v !== null && Date.now() - fmProfileCache.ts < 1800000) {
-      return Promise.resolve(fmProfileCache.v);
-    }
-    return fmApi('user_profile').then(function (j) {
-      var u = (j && j.user_data) || j || {};
-      var q = u.is_pro_plus === true ? 2160 : (u.is_pro === true ? 1080 : 720);
-      fmProfileCache = { v: q, ts: Date.now() };
-      return q;
-    }).catch(function () { return 720; });
-  }
-  function fmMap() {
-    try {
-      var o = JSON.parse(localStorage.getItem(FM_K.map) || '{}');
-      return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
-    } catch (e) { return {}; }
-  }
-  function fmMapGet(type, id) {
-    var e = fmMap()['tmdb:' + type + ':' + id];
-    return (e && e.filmixId && Date.now() - (e.updatedAt || 0) < 2592000000) ? e : null;
-  }
-  function fmMapSet(type, id, filmixId, title, year) {
-    var all = fmMap();
-    all['tmdb:' + type + ':' + id] = {
-      filmixId: filmixId, title: title || '', year: year || '', updatedAt: Date.now()
-    };
-    try { localStorage.setItem(FM_K.map, JSON.stringify(all)); } catch (e) {}
-  }
-  function fmNormalize(p) {
-    if (!p || !p.id) return null;
-    var section = Number(p.section || 0);
-    return {
-      id: String(p.id),
-      title: String(p.title || ''),
-      orig: String(p.original_title || p.orig_title || ''),
-      year: String(p.year || ''),
-      isTvHint: section === 7,
-      section: section,
-      alt: String(p.alt_name || ''),
-      href: 'https://filmix.my/' + (section === 7 ? 'seria' : 'film') + '/' + p.id + '.html',
-      provider: 'filmix'
-    };
-  }
-  function filmixList(j) {
-    var raw = (j && j.posts) || (Array.isArray(j) ? j : []) || [];
-    return raw.map(fmNormalize).filter(Boolean);
-  }
-  function filmixSearch(query) {
-    var q = String(query || '').replace(/[«»"“”]/g, '').trim();
-    if (!q) return Promise.resolve([]);
-    /* suggestions для гостя часто повертає [] — тоді реально працює /search?story=
-       (саме його використовує go-filmix). Фолбек має спрацьовувати і на порожній список. */
-    var fallback = function () {
-      return fmApi('search?story=' + encodeURIComponent(q))
-        .then(filmixList).catch(function () { return []; });
-    };
-    return fmApi('suggestions?search_word=' + encodeURIComponent(q))
-      .then(function (j) {
-        var list = filmixList(j);
-        return list.length ? list : fallback();
-      })
-      .catch(fallback);
-  }
-  function filmixScore(cand, names, year, type) {
-    var list = [cand.title, cand.orig].filter(Boolean).map(normStr);
-    var best = 0;
-    (names || []).forEach(function (n) {
-      var t = normStr(n);
-      if (!t) return;
-      list.forEach(function (c) {
-        var v = 0;
-        if (c === t) v = 100;
-        else if (c.indexOf(t) === 0 || t.indexOf(c) === 0) v = 80;
-        else if (c.indexOf(t) >= 0 || t.indexOf(c) >= 0) v = 60;
-        else {
-          var cw = c.split(' ').filter(function (w) { return w.length > 2; });
-          var tw = t.split(' ').filter(function (w) { return w.length > 2; });
-          if (cw.length && tw.length) {
-            var hits = cw.filter(function (w) { return tw.indexOf(w) >= 0; }).length;
-            v = Math.round((hits / Math.max(cw.length, tw.length)) * 50);
-          }
-        }
-        if (v > best) best = v;
-      });
-    });
-    if (!best) return 0;
-    if (cand.year && year && Math.abs(parseInt(cand.year, 10) - parseInt(year, 10)) > 1) best -= 40;
-    if (type && cand.isTvHint !== (type === 'tv')) best -= 30;
-    return Math.max(0, best);
-  }
-  function searchFilmixSmart(title, origTitle, ruTitle, year, type, tmdbId) {
-    var names = [], seenName = {};
-    [origTitle, ruTitle, title].forEach(function (n) {
-      var s = String(n || '').replace(/[«»"“”]/g, '').trim();
-      if (s && !seenName[normStr(s)]) { seenName[normStr(s)] = 1; names.push(s); }
-    });
-    return Promise.all(names.map(function (q) {
-      return filmixSearch(q).catch(function () { return []; });
-    })).then(function (groups) {
-      var seen = {}, out = [];
-      groups.forEach(function (g) {
-        g.forEach(function (c) {
-          var score = filmixScore(c, names, year, type);
-          if (score < 60) return; /* жорсткий фільтр */
-          if (seen[c.id]) {
-            var prev = out.filter(function (x) { return x.id === c.id; })[0];
-            if (prev && score > prev.score) prev.score = score;
-            return;
-          }
-          seen[c.id] = 1;
-          c.score = score;
-          out.push(c);
-        });
-      });
-      out.sort(function (a, b) { return b.score - a.score; });
-      /* Прив'язка, обрана користувачем раніше, має пріоритет */
-      var mapped = tmdbId ? fmMapGet(type || 'movie', tmdbId) : null;
-      if (mapped) {
-        var chosen = out.filter(function (x) { return x.id === String(mapped.filmixId); })[0];
-        if (chosen) {
-          out = [chosen].concat(out.filter(function (x) { return x !== chosen; }));
-        } else {
-          out.unshift({ id: String(mapped.filmixId), title: mapped.title || title,
-            orig: origTitle || '', year: mapped.year || '', href: 'https://filmix.my/film/' + mapped.filmixId + '.html',
-            isTvHint: type === 'tv', score: 100, provider: 'filmix' });
-        }
-      }
-      if (out.length) {
-        out[0].matches = out.slice(1, 10).map(function (x) {
-          return { id: x.id, title: x.title, year: x.year, url: x.href };
-        });
-      }
-      return out;
-    });
-  }
-  function filmixQualities(link) {
-    var m = /_\[([\d,]+)\]\.mp4/i.exec(String(link || ''));
-    if (m) {
-      return m[1].split(',').map(function (x) { return parseInt(x, 10); })
-        .filter(function (n) { return n > 0; });
-    }
-    return /_%s\.mp4/i.test(String(link || '')) ? [1080, 720, 480] : [];
-  }
-  function filmixApplyQuality(link, q) {
-    return String(link || '')
-      .replace(/_\[[\d,]+\]\.mp4/i, '_' + q + '.mp4')
-      .replace(/_%s\.mp4/i, '_' + q + '.mp4')
-      .replace(/sundb\.coldcdn\.xyz/ig, 'sundb.nl');
-  }
-  function fmIsUa(name) { return /укр|укра|ukr|\bua\b|IdeaFilm|Truefans|Новафільм|Невафільм/i.test(String(name || '')); }
-  function filmixMakeVariant(link, translation, season, episode, cap, isUa) {
-    var qs = filmixQualities(link).filter(function (q) { return q <= cap; });
-    if (!qs.length) qs = [480]; /* без токена — 480p */
-    qs.sort(function (a, b) { return b - a; });
-    return qs.slice(0, 4).map(function (q) {
-      var clean = filmixApplyQuality(link, q);
-      var direct = clean.replace(/:hls:manifest\.m3u8.*$/i, '');
-      return {
-        translation: translation, season: season ? 'Сезон ' + season : '',
-        episode: episode ? 'Серія ' + episode : '',
-        quality: q + 'p', url: direct, audioLang: isUa ? 'uk' : '',
-        mcSkipQuality: true
-      };
-    });
-  }
-  function resolveFilmix(cand, type, tmdbId) {
-    var cap = 720;
-    return filmixMaxQuality().then(function (q) {
-      cap = q;
-      return fmCached('fm:post:' + cand.id, 5400000, function () {
-        return fmApi('post/' + encodeURIComponent(cand.id));
-      });
-    }).then(function (post) {
-      if (!post || !post.player_links) throw new Error('Filmix: дані поста відсутні');
-      var links = post.player_links;
-      var out = [];
-      var trs = [];
-      if (Array.isArray(links.movie)) {
-        links.movie.forEach(function (t) { if (t && t.link) trs.push({ name: t.translation || 'Озвучка', link: t.link }); });
-      }
-      if (links.playlist && typeof links.playlist === 'object') {
-        Object.keys(links.playlist).forEach(function (sNum) {
-          var season = links.playlist[sNum];
-          if (!season || typeof season !== 'object') return;
-          Object.keys(season).forEach(function (name) {
-            var eps = season[name];
-            if (!eps) return;
-            var arr = Array.isArray(eps) ? eps : Object.keys(eps).map(function (k) {
-              return Object.assign({ _n: parseInt(k, 10) }, eps[k]);
-            });
-            arr.forEach(function (e, i) {
-              if (e && e.link) trs.push({
-                name: name, link: e.link, season: parseInt(sNum, 10) || 0,
-                episode: (e._n || i + 1)
-              });
-            });
-          });
-        });
-      }
-      if (!trs.length) throw new Error('Filmix: немає доступних озвучок');
-      trs.sort(function (a, b) { return (fmIsUa(b.name) ? 1 : 0) - (fmIsUa(a.name) ? 1 : 0); });
-      var seen = {};
-      trs.forEach(function (t) {
-        var key = t.name + '|' + (t.season || 0) + '|' + (t.episode || 0);
-        if (seen[key]) return;
-        seen[key] = 1;
-        out = out.concat(filmixMakeVariant(t.link, t.name, t.season, t.episode, cap, fmIsUa(t.name)));
-      });
-      if (!out.length) throw new Error('Filmix: немає потоків для цього токена');
-      if (tmdbId) fmMapSet(type || 'movie', tmdbId, cand.id, cand.title, cand.year);
-      return out;
     });
   }
 
@@ -740,7 +453,9 @@
         var tw = t.split(' ').filter(function (w) { return w.length > 2; });
         if (!cw.length || !tw.length) return;
         var hits = cw.filter(function (w) { return tw.indexOf(w) >= 0; }).length;
-        v = Math.round((hits / Math.max(cw.length, tw.length)) * 50);
+        /* Повний збіг слів (напр. "Аватар 3: Вогонь і попіл" проти
+           "Аватар: Вогонь і Попіл") має проходити поріг 60. */
+        v = Math.round((hits / Math.max(cw.length, tw.length)) * 80);
       }
       if (v > best) best = v;
     });
@@ -778,6 +493,262 @@
     return Promise.resolve(tmdbFetch('/' + (type === 'tv' ? 'tv' : 'movie') + '/' + tmdbId + '?language=ru-RU'))
       .then(function (d) { return (d && (d.title || d.name)) || ''; })
       .catch(function () { return ''; });
+  }
+
+  /* ─── Tortuga через KinoUKR ───────────────────────────────────────────────
+     Адаптовано з kinoukr_snack: картки шукаються на kinoukr.tv/xfsearch,
+     сторінка тайтла дає iframe Tortuga, а конфіг плеєра лежить у TortugaCore:
+     base64, перший байт — seed, далі b[i] ^ ((seed + 7*(i-1) + 13) & 255).
+     ─────────────────────────────────────────────────────────────────────── */
+  var KINOUKR_SITE = 'https://kinoukr.tv';
+  var TORTUGA_RE = /^https:\/\/(?:tortuga\.tw|tortuga\.wtf)\/(?:vod|embed)\/\d+(?:[?#]|$)/i;
+  var B64_ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  var kinoukrCache = {};
+
+  function isTortugaPlayer(u) { return TORTUGA_RE.test(String(u || '')); }
+  function tortugaFix(u) { return decodeEntities(String(u || '')).trim().replace(/0yql3tj/g, 'oyql3tj'); }
+
+  function b64bytes(s) {
+    var src = String(s || '').replace(/-/g, '+').replace(/_/g, '/').replace(/[^A-Za-z0-9+\/]/g, '');
+    var out = [], buf = 0, bits = 0;
+    for (var i = 0; i < src.length; i++) {
+      buf = (buf << 6) | B64_ALPHA.indexOf(src.charAt(i));
+      bits += 6;
+      if (bits >= 8) { bits -= 8; out.push((buf >> bits) & 255); buf &= (1 << bits) - 1; }
+    }
+    return out;
+  }
+  function bytesToUtf8(a) {
+    var s = '', i = 0;
+    while (i < a.length) {
+      var c = a[i++];
+      if (c < 128) s += String.fromCharCode(c);
+      else if (c >= 192 && c < 224) s += String.fromCharCode(((c & 31) << 6) | (a[i++] & 63));
+      else if (c >= 224 && c < 240) {
+        s += String.fromCharCode(((c & 15) << 12) | ((a[i] & 63) << 6) | (a[i + 1] & 63));
+        i += 2;
+      } else {
+        var cp = ((c & 7) << 18) | ((a[i] & 63) << 12) | ((a[i + 1] & 63) << 6) | (a[i + 2] & 63);
+        i += 3;
+        cp -= 0x10000;
+        s += String.fromCharCode(0xD800 + (cp >> 10), 0xDC00 + (cp & 1023));
+      }
+    }
+    return s;
+  }
+  function tortugaUnpack(v) {
+    var b = b64bytes(v);
+    if (b.length < 2) return '';
+    var seed = b[0], out = [];
+    for (var i = 1; i < b.length; i++) out.push(b[i] ^ ((seed + 7 * (i - 1) + 13) & 255));
+    return bytesToUtf8(out);
+  }
+  function tortugaSubs(s) {
+    var out = [], re = /\[([^\]]*)\]([^,\[]+)/g, m;
+    while ((m = re.exec(String(s || ''))) !== null) {
+      var u = tortugaFix(m[2]);
+      if (/^https?:\/\//i.test(u)) out.push(u);
+    }
+    return out;
+  }
+  function slimTortuga(n) {
+    if (!n || typeof n !== 'object') return null;
+    var o = { title: decodeEntities(String(n.title || '')).replace(/\s+/g, ' ').trim() };
+    if (n.file) o.file = tortugaFix(n.file);
+    if (n.subtitle) o.subtitle = tortugaSubs(n.subtitle)[0] || '';
+    if (Array.isArray(n.folder)) {
+      o.folder = n.folder.map(slimTortuga).filter(function (x) { return x; });
+      if (!o.folder.length) delete o.folder;
+    }
+    return o;
+  }
+  function cleanTortugaTree(nodes) {
+    var out = [];
+    (nodes || []).forEach(function (n) {
+      if (!n || typeof n !== 'object') return;
+      if (n.file && /\/hls\/trailers\//i.test(n.file)) return;
+      var o = { title: n.title || '' };
+      if (n.file) o.file = n.file;
+      if (n.subtitle) o.subtitle = n.subtitle;
+      if (Array.isArray(n.folder)) {
+        o.folder = cleanTortugaTree(n.folder);
+        if (!o.folder.length) delete o.folder;
+      }
+      if (o.file || o.folder) out.push(o);
+    });
+    return out;
+  }
+  function parseTortugaHtml(html) {
+    var src = String(html || '');
+    var i = src.indexOf('TortugaCore(');
+    if (i < 0) return null;
+    var blk = src.slice(i, i + 200000);
+    var fm = /\bfile\s*:\s*"([^"]+)"/.exec(blk);
+    if (!fm) return null;
+    var file = tortugaUnpack(fm[1]);
+    var tree = null;
+    if (/^\s*\[/.test(file)) {
+      try { tree = JSON.parse(file); } catch (e) { return null; }
+    } else if (/^https?:\/\//i.test(file.trim())) {
+      if (/\/hls\/trailers\//i.test(file)) return null;
+      var sm = /\bsubtitle\s*:\s*"([^"]*)"/.exec(blk);
+      tree = [{ title: 'Tortuga', file: file.trim(), subtitle: sm ? tortugaUnpack(sm[1]) : '' }];
+    } else return null;
+    if (!Array.isArray(tree)) tree = [tree];
+    var out = cleanTortugaTree(tree.map(slimTortuga).filter(function (x) { return x; }));
+    return out.length ? out : null;
+  }
+
+  function parseKinoukrSearch(html) {
+    var out = [], seen = {};
+    var parts = String(html || '').split('<div class="short clearfix');
+    for (var i = 1; i < parts.length && out.length < 20; i++) {
+      var b = parts[i];
+      var m = /class="short-title"\s+href="([^"]+)">([^<]+)<\/a>/.exec(b);
+      if (!m) continue;
+      var href = decodeEntities(m[1]).trim();
+      if (!/^https?:\/\/(?:www\.)?kinoukr\.tv\//i.test(href) || seen[href]) continue;
+      seen[href] = 1;
+      var kind = /m-series|m-sezon/.test(b) ? 'tv' : (/m-film/.test(b) ? 'movie' : '');
+      out.push({
+        href: href, title: decodeEntities(m[2]).replace(/\s+/g, ' ').trim(), kind: kind,
+        isTvHint: kind === 'tv' ? true : (kind === 'movie' ? false : null), provider: 'tortuga'
+      });
+    }
+    return out;
+  }
+  function parseKinoukrPage(html) {
+    var info = { title: '', orig: '', year: 0, players: [] };
+    var h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(String(html || ''));
+    if (h1) info.title = decodeEntities(h1[1].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+    var om = /class="foriginal">([^<]*)</.exec(String(html || ''));
+    if (om) info.orig = decodeEntities(om[1]).trim();
+    var ym = /<span>Рік:<\/span>\s*<a[^>]*\/xfsearch\/year\/(\d{4})\//.exec(String(html || ''))
+      || /\/xfsearch\/year\/(\d{4})\//.exec(String(html || ''));
+    if (ym) info.year = parseInt(ym[1], 10);
+    var re = /<iframe[^>]+src="(https?:\/\/[^"]+)"/ig, m;
+    while ((m = re.exec(String(html || ''))) !== null) {
+      var u = decodeEntities(m[1]).trim();
+      if (isTortugaPlayer(u) && info.players.indexOf(u) < 0) info.players.push(u);
+    }
+    return info;
+  }
+  function searchKinoukr(query) {
+    var q = String(query || '').replace(/[«»"“”]/g, '').trim();
+    if (!q) return Promise.resolve([]);
+    var ck = 'ku:' + q.toLowerCase();
+    var hit = kinoukrCache[ck];
+    if (hit && Date.now() < hit.until) return Promise.resolve(hit.items);
+    var url = KINOUKR_SITE + '/xfsearch/' + encodeURIComponent(q) + '/';
+    return px(url, { referer: KINOUKR_SITE + '/', allow404: true }).then(function (html) {
+      var items = parseKinoukrSearch(html);
+      kinoukrCache[ck] = { items: items, until: Date.now() + (items.length ? 3600000 : 600000) };
+      return items;
+    }).catch(function () {
+      kinoukrCache[ck] = { items: [], until: Date.now() + 600000 };
+      return [];
+    });
+  }
+  function searchKinoukrSmart(title, origTitle, ruTitle, year, type) {
+    var names = [], seenName = {};
+    [origTitle, ruTitle, title].forEach(function (n) {
+      var s = String(n || '').replace(/[«»"“”]/g, '').trim();
+      if (s && !seenName[normStr(s)]) { seenName[normStr(s)] = 1; names.push(s); }
+    });
+    if (!names.length) return Promise.resolve([]);
+    /* XFsearch працює за тегами: «Avatar: Fire and Ash» треба шукати ще й
+       як «Avatar», інакше DLE віддає порожній 404. Для збігу лишаємо повну назву. */
+    var queries = [], seenQuery = {};
+    names.forEach(function (n) {
+      var k = normStr(n);
+      if (!seenQuery[k]) { seenQuery[k] = 1; queries.push(n); }
+      var base = String(n).split(/[:—–]/)[0].trim();
+      var variants = [base];
+      var words = base.split(/\s+/).filter(function (w) { return w; });
+      if (words.length > 2) variants.push(words.slice(0, 2).join(' '));
+      var hyphen = /[^\s:—–]+(?:-[^\s:—–]+)+/.exec(base);
+      if (hyphen) variants.push(hyphen[0]);
+      variants.forEach(function (v) {
+        v = String(v || '').trim();
+        var vk = normStr(v);
+        if (v && v !== n && !seenQuery[vk]) { seenQuery[vk] = 1; queries.push(v); }
+      });
+    });
+    var wantType = type === 'tv' ? 'tv' : (type === 'movie' ? 'movie' : '');
+    var wantYear = parseInt(year, 10) || 0;
+    return Promise.all(queries.slice(0, 8).map(function (q) {
+      return searchKinoukr(q).catch(function () { return []; });
+    })).then(function (groups) {
+      var byHref = {}, order = [];
+      groups.forEach(function (g) {
+        g.forEach(function (c) { if (!byHref[c.href]) { byHref[c.href] = c; order.push(c); } });
+      });
+      order.sort(function (a, b) {
+        function rank(c) {
+          var n = normStr(c.title), v = 0;
+          names.forEach(function (x) { if (normStr(x) === n) v += 100; });
+          if (wantType && c.kind && c.kind !== wantType) v -= 30;
+          return v;
+        }
+        return rank(b) - rank(a);
+      });
+      var checked = 0;
+      return order.slice(0, 8).reduce(function (chain, c) {
+        return chain.then(function (acc) {
+          if (acc.length >= 3 || checked >= 6) return acc;
+          checked++;
+          return px(c.href, { referer: KINOUKR_SITE + '/', allow404: true }).then(function (html) {
+            var info = parseKinoukrPage(html);
+            if (!info.players.length) return acc;
+            var titles = [info.title, info.orig, c.title].map(normStr).filter(function (x) { return x; });
+            var ok = false;
+            names.forEach(function (n) { if (titles.indexOf(normStr(n)) >= 0) ok = true; });
+            if (!ok) return acc;
+            if (wantYear && info.year && Math.abs(info.year - wantYear) > 1) return acc;
+            acc.push({
+              href: c.href, title: info.title || c.title, orig: info.orig,
+              year: info.year || '', isTvHint: wantType ? wantType === 'tv' : !!c.isTvHint,
+              provider: 'tortuga', players: info.players,
+              score: (wantYear && info.year === wantYear ? 100 : 80)
+            });
+            return acc;
+          }).catch(function () { return acc; });
+        });
+      }, Promise.resolve([])).then(function (res) {
+        return res.sort(function (a, b) { return b.score - a.score; });
+      });
+    });
+  }
+  function resolveTortuga(cand) {
+    if (detailCache[cand.href]) return Promise.resolve(detailCache[cand.href]);
+    var players = (cand.players || []).slice(0, 4);
+    if (!players.length) return Promise.reject(new Error('Tortuga: немає плеєра'));
+    return players.reduce(function (chain, href) {
+      return chain.then(function (flat) {
+        if (flat.length) return flat;
+        return px(href, { referer: KINOUKR_SITE + '/' }).then(function (html) {
+          var tree = parseTortugaHtml(html);
+          if (!tree || !tree.length) return [];
+          return flatten(tree).filter(function (x) {
+            return x.url && !/\/hls\/trailers\//i.test(x.url);
+          }).map(function (x) {
+            if (!x.translation) x.translation = 'Tortuga';
+            /* Підписаний HLS може протермінуватись — тримаємо iframe того ж
+               Tortuga як запасний шлях (без переходу на іншого провайдера). */
+            if (!x.fallbackIframeUrl) x.fallbackIframeUrl = players[0];
+            return x;
+          });
+        }).catch(function () { return []; });
+      });
+    }, Promise.resolve([])).then(function (flat) {
+      /* Плеєр Tortuga блокує серверні запити з CF-IP — лишаємо його власний
+         iframe як робочий шлях, без переходу на іншого провайдера. */
+      if (!flat.length) {
+        flat = [{ title: 'Tortuga', translation: 'Tortuga', iframeUrl: players[0], season: '', episode: '' }];
+      }
+      detailCache[cand.href] = flat;
+      return flat;
+    });
   }
 
   function resolveEmbf(cand) {
@@ -870,7 +841,7 @@
   function loadFlatForResult(cand) {
     if (detailCache[cand.href]) return Promise.resolve(detailCache[cand.href]);
     if (cand.provider === 'ashdi') return resolveAshdi(cand);
-    if (cand.provider === 'filmix') return resolveFilmix(cand, cand.mcType, cand.mcTmdbId);
+    if (cand.provider === 'tortuga') return resolveTortuga(cand);
     if (cand.provider === 'embf') {
       return resolveEmbf(cand).then(function (res) {
         if (res && res.length) detailCache[cand.href] = res;
@@ -1031,7 +1002,9 @@
     ProxyLoader.prototype.load = function (context, loaderConfig, callbacks) {
       if (context && (context.frag || context.keyInfo)) {
         var u = String(context.url || '');
-        if (/^https:\/\/[^/]*ashdi\.vip\//i.test(u)) context.url = proxyMediaUrl(u);
+        /* Фрагменти Ashdi без ACAO йдуть через той самий CF-проксі, що й mp4.
+           Якорі кінця не дають подвійно проксувати вже проксований URL воркера. */
+        if (/^https?:\/\/(?:[^/?#]*\.)?(?:ashdi\.vip|sniplyo\.online|creavio\.online)(?:\/|[?#]|$)/i.test(u)) context.url = proxyMediaUrl(u);
       }
       return this._base.load(context, loaderConfig, callbacks);
     };
@@ -1075,6 +1048,7 @@
       }
     }
 
+    video.addEventListener('error', fallbackToIframe);
     videoWrap.appendChild(video);
     ov.appendChild(videoWrap);
     document.body.appendChild(ov);
@@ -1110,7 +1084,22 @@
     var desiredAudioLang = meta.audioLang || '';
     var overlay = null;
     var currentVariant = meta.initial || (meta.variants && meta.variants[0]) || null;
+    /* Збережена озвучка має перемагати варіант за замовчуванням */
+    if (meta.initialTranslation && meta.variants && meta.variants.length) {
+      var tr = String(meta.initialTranslation).toLowerCase();
+      var savedVariant = meta.variants.find(function (v) {
+        return String(v.translation || '').toLowerCase() === tr;
+      });
+      if (savedVariant) currentVariant = savedVariant;
+    }
     var baseTitle = String(meta.title || 'MyCinema').replace(/ · S\d+E\d+$/, '');
+    var iframeFallbackUrl = String(meta.iframeFallback || '');
+    var fellBackToIframe = false;
+    function fallbackToIframe() {
+      if (fellBackToIframe || !iframeFallbackUrl) return;
+      fellBackToIframe = true;
+      openIframeOverlay(iframeFallbackUrl, baseTitle);
+    }
 
     function variantCode(v) {
       var s = extractNum(v && v.season, 0), e = extractNum(v && v.episode, 0);
@@ -1162,6 +1151,12 @@
       if (resumeAt && resumeAt > 0) pos = resumeAt;
       else if (keepTime) { try { pos = video.currentTime || 0; } catch (e) {} }
       var isHls = /\.m3u8(\?|$)/i.test(nextUrl);
+      /* CDN Ashdi без ACAO — гонимо через воркер, він пробрасує Range
+         і ставить Access-Control-Allow-Origin. */
+      var mediaSrc = nextUrl;
+      if (/^https?:\/\//i.test(mediaSrc) && /ashdi\.vip|sniplyo\.online|creavio\.online/i.test(mediaSrc)) {
+        mediaSrc = proxyMediaUrl(mediaSrc);
+      }
       function afterSeek() {
         var seek = function () {
           try { video.currentTime = pos; } catch (e) {}
@@ -1171,36 +1166,41 @@
         video.play().catch(function () {});
       }
       if (isHls && !meta.forceHls && video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = nextUrl;
+        video.src = mediaSrc;
         video.addEventListener('loadedmetadata', applyNativeAudio);
         afterSeek();
       } else if (isHls) {
         ensureHls().then(function (Hls) {
           if (Hls && Hls.isSupported()) {
             var hlsOpts = { enableWorker: true, lowLatencyMode: false };
-            if (meta.forceHls) {
+            /* mcProxy:true або вже проксований HLS — ставимо свій лоадер. */
+            if (meta.forceHls || mediaSrc !== nextUrl) {
               hlsOpts.loader = createProxyLoader(Hls.DefaultConfig.loader);
               hlsOpts.fLoader = createProxyLoader(Hls.DefaultConfig.fLoader || Hls.DefaultConfig.loader);
             }
             var hls = ov._hls || new Hls(hlsOpts);
             ov._hls = hls;
-            hls.loadSource(nextUrl);
+            hls.loadSource(mediaSrc);
             if (!hls.media) hls.attachMedia(video);
             bindHlsAudio(Hls, hls);
+            hls.on(Hls.Events.ERROR, function (_e, data) {
+              if (data && data.fatal) fallbackToIframe();
+            });
           } else {
-            video.src = nextUrl;
+            video.src = mediaSrc;
           }
           afterSeek();
-        }).catch(function () { video.src = nextUrl; afterSeek(); });
+        }).catch(function () { video.src = mediaSrc; afterSeek(); });
       } else {
         if (ov._hls) { try { ov._hls.destroy(); } catch (e) {} ov._hls = null; }
-        video.src = nextUrl;
+        video.src = mediaSrc;
         video.addEventListener('loadedmetadata', applyNativeAudio);
         afterSeek();
       }
     }
 
-    loadSource(url, meta.audioLang, false);
+    loadSource((currentVariant && currentVariant.url) || url,
+      (currentVariant && currentVariant.audioLang) || meta.audioLang, false);
 
     if (window.MCPlayerOverlay && meta.variants && meta.variants.length) {
       overlay = window.MCPlayerOverlay.mount({
@@ -1227,6 +1227,7 @@
             loadSource(v.url, v.audioLang, false, at > 15 ? at : 0);
           }
           setTimeout(function () { switchingSource = false; }, 1500);
+          if (typeof meta.onVariantSwitch === 'function') meta.onVariantSwitch(v);
         }
       });
       ov._overlay = overlay;
@@ -1375,6 +1376,7 @@
         saveStreamPref(mediaKey, { provId: prov ? prov.id : '', translation: ui.translation });
         var sNum = epMeta ? epMeta.sNum : 0;
         var epNum = epMeta ? epMeta.epNum : 0;
+        var markMeta = epMeta;
         var rKey = (mediaKey || mediaTitle) + '|s' + sNum + '|e' + epNum;
         var labelTitle = mediaTitle + (epMeta && epMeta.code ? ' · ' + epMeta.code : '');
         openVideo(variants[0].url, variants[0].subtitle, {
@@ -1384,9 +1386,30 @@
           initial: variants[0],
           audioLang: variants[0].audioLang,
           forceHls: variants.some(function (v) { return v.proxy; }),
+          /* Якщо прямий HLS протермінувався (403) — лишаємо iframe того самого
+             провайдера, без автоматичного переходу на іншого. */
+          iframeFallback: variants[0].iframeFallback || '',
+          /* Озвучка, вибрана раніше, має застосовуватись і в оверлеї */
+          initialTranslation: ui.translation,
+          onVariantSwitch: function (v) {
+            if (!v) return;
+            if (v.translation) {
+              ui.translation = v.translation;
+              saveStreamPref(mediaKey, { translation: ui.translation });
+            }
+            var ns = parseInt(v.season, 10) || 0;
+            var ne = parseInt(v.episode, 10) || 0;
+            markMeta = {
+              sNum: ns, epNum: ne,
+              code: (ns || ne)
+                ? 'S' + (ns < 10 ? '0' + ns : ns) + 'E' + (ne < 10 ? '0' + ne : ne)
+                : (epMeta && epMeta.code)
+            };
+          },
           onClosed: function (watchedSec) {
-            if (epMeta && mediaKey && watchedSec >= 25 && !isEpWatchedInLib(mediaKey, sNum, epNum)) {
-              ui.pendingMark = epMeta;
+            if (markMeta && Number.isFinite(markMeta.sNum) && Number.isFinite(markMeta.epNum) &&
+                mediaKey && watchedSec >= 25 && !isEpWatchedInLib(mediaKey, markMeta.sNum, markMeta.epNum)) {
+              ui.pendingMark = markMeta;
               loadCurrentProvider();
             }
           }
@@ -1571,7 +1594,7 @@
     }
     body.innerHTML = '<div class="streams-status">Пошук «' + esc(q || origTitle) + '»…</div>';
 
-    var ashdiP = lookupAshdi(imdbId, tmdbId, type).then(function (href) {
+    var ashdiP = lookupAshdi(imdbId, tmdbId, type, q).then(function (href) {
       if (!href) return [];
       return [{
         href: href,
@@ -1586,23 +1609,19 @@
     var embfP = localizedP.then(function (ruTitle) {
       return searchEmbfSmart(q, origTitle, ruTitle, year);
     });
-    var filmixP = localizedP.then(function (ruTitle) {
-      return searchFilmixSmart(q, origTitle, ruTitle, year, type, tmdbId);
+    var tortugaP = localizedP.then(function (ruTitle) {
+      return searchKinoukrSmart(q, origTitle, ruTitle, year, type);
     });
-
-    Promise.allSettled([ashdiP, embfP, filmixP]).then(function (results) {
+    Promise.allSettled([ashdiP, embfP, tortugaP]).then(function (results) {
       if (!body || !body.isConnected) return;
       var ashdi = results[0].status === 'fulfilled' ? results[0].value : [];
       var embf = results[1].status === 'fulfilled' ? results[1].value : [];
-      var filmix = results[2].status === 'fulfilled' ? results[2].value : [];
+      var tortuga = results[2].status === 'fulfilled' ? results[2].value : [];
 
       var providers = [];
       if (ashdi.length) providers.push({ id: 'ashdi', label: 'Ashdi', results: ashdi });
       if (embf.length) providers.push({ id: 'embf', label: 'EmbF', results: embf });
-      if (filmix.length) {
-        filmix.forEach(function (c) { c.mcType = type; c.mcTmdbId = tmdbId; });
-        providers.push({ id: 'filmix', label: 'Filmix', results: filmix });
-      }
+      if (tortuga.length) providers.push({ id: 'tortuga', label: 'Tortuga', results: tortuga });
 
       if (!providers.length) {
         body.innerHTML = '<div class="streams-error">Нічого не знайдено</div>';
@@ -1622,6 +1641,7 @@
   // потік убудованим плеєром замість спроби запустити VLC.
   window.mcStreamsOpen = function (url, title) {
     if (!url) return;
+    ensureStreamsHistoryGuard(); /* Back закриває плеєр, а не картку під ним */
     openVideo(url, '', { title: title || 'MyCinema' });
   };
   window._streamsUtil = {
@@ -1630,81 +1650,12 @@
     embfMatchScore: embfMatchScore, resolveEmbf: resolveEmbf,
     isAshdiPlayer: isAshdiPlayer, parseAshdiHtml: parseAshdiHtml, tagAshdiTree: tagAshdiTree,
     lookupAshdi: lookupAshdi, resolveAshdi: resolveAshdi,
-    proxyMediaUrl: proxyMediaUrl, createProxyLoader: createProxyLoader,
-    filmixApi: fmApi, filmixDevId: fmDevId, filmixTokenRequest: filmixTokenRequest,
-    filmixDeviceStart: filmixDeviceStart, filmixDeviceCheck: filmixDeviceCheck,
-    filmixMaxQuality: filmixMaxQuality, filmixSearch: filmixSearch,
-    searchFilmixSmart: searchFilmixSmart, filmixScore: filmixScore,
-    filmixQualities: filmixQualities, filmixApplyQuality: filmixApplyQuality,
-    resolveFilmix: resolveFilmix, fmMapSet: fmMapSet, fmMapGet: fmMapGet
+    isTortugaPlayer: isTortugaPlayer, tortugaUnpack: tortugaUnpack,
+    parseTortugaHtml: parseTortugaHtml, parseKinoukrSearch: parseKinoukrSearch,
+    parseKinoukrPage: parseKinoukrPage, searchKinoukr: searchKinoukr,
+    searchKinoukrSmart: searchKinoukrSmart, resolveTortuga: resolveTortuga,
+    openVideo: openVideo,
+    proxyMediaUrl: proxyMediaUrl, createProxyLoader: createProxyLoader
   };
 
-  window.filmixTokenApi = {
-    get: fmToken,
-    set: function (t) { fmSetToken(t); fmProfileCache = { v: null, ts: 0 }; },
-    start: filmixDeviceStart,
-    check: filmixDeviceCheck,
-    profile: filmixMaxQuality,
-  };
-
-  window.injectFilmixSettings = function () {
-    /* Блок може бути або в модалці, або переміщений у сторінку налаштувань */
-    var box = document.getElementById('settings-online-box');
-    if (!box) {
-      var modal = document.getElementById('settings-online-modal');
-      box = modal && modal.querySelector('.settings-box');
-    }
-    if (!box || box.querySelector('#filmix-token')) return;
-    var sec = document.createElement('div');
-    sec.className = 'settings-section';
-    sec.innerHTML =
-      '<div class="settings-section-title">Filmix · мобільний API</div>' +
-      '<label class="settings-field-label" for="filmix-token">user_dev_token</label>' +
-      '<input id="filmix-token" class="settings-field" placeholder="Вставте готовий токен" autocomplete="off">' +
-      '<div class="settings-field-actions">' +
-        '<button class="settings-btn" id="filmix-save" type="button">Зберегти</button>' +
-        '<button class="settings-btn" id="filmix-profile" type="button">Перевірити якість</button>' +
-      '</div>' +
-      '<label class="settings-field-label" for="filmix-code">Прив\'язка пристрою</label>' +
-      '<div class="settings-field-actions">' +
-        '<button class="settings-btn" id="filmix-code" type="button">Отримати код</button>' +
-        '<button class="settings-btn" id="filmix-activate" type="button">Активувати</button>' +
-      '</div>' +
-      '<div id="filmix-status" class="settings-field-status"></div>';
-    box.appendChild(sec);
-    var input = sec.querySelector('#filmix-token');
-    var status = sec.querySelector('#filmix-status');
-    input.value = fmToken();
-    sec.querySelector('#filmix-save').addEventListener('click', function () {
-      window.filmixTokenApi.set(input.value.trim());
-      status.textContent = input.value.trim() ? 'Токен збережено' : 'Токен очищено';
-      filmixMaxQuality().then(function (q) {
-        status.textContent += ' · макс. ' + q + 'p';
-      });
-    });
-    sec.querySelector('#filmix-profile').addEventListener('click', function () {
-      filmixMaxQuality().then(function (q) {
-        status.textContent = 'Максимальна якість токена: ' + q + 'p';
-      }).catch(function (e) { status.textContent = 'Помилка: ' + e.message; });
-    });
-    sec.querySelector('#filmix-code').addEventListener('click', function () {
-      status.textContent = 'Запит коду…';
-      filmixDeviceStart().then(function (p) {
-        status.textContent = p.user_code
-          ? 'Код: ' + p.user_code + ' — введіть його на filmix.my/consoles, потім «Активувати»'
-          : 'Код не отримано — перевірте відповідь API';
-      }).catch(function (e) { status.textContent = 'Помилка: ' + e.message; });
-    });
-    sec.querySelector('#filmix-activate').addEventListener('click', function () {
-      status.textContent = 'Перевірка…';
-      filmixDeviceCheck().then(function (r) {
-        if (r.activated) {
-          input.value = r.token;
-          status.textContent = 'Активовано. Токен збережено.';
-        } else {
-          status.textContent = 'Ще не активовано. Код: ' + (r.user_code || '—');
-        }
-      }).catch(function (e) { status.textContent = 'Помилка: ' + e.message; });
-    });
-  };
 })();

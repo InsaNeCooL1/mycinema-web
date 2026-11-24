@@ -13,7 +13,6 @@ function openSettings() {
   renderSettingsSwatches();
   injectSnowToggle();
   injectExtraSettings();
-  if (typeof injectFilmixSettings === 'function') injectFilmixSettings();
   if (typeof injectDismissedReset === 'function') injectDismissedReset();
   openSettingsMenu();
 }
@@ -375,6 +374,8 @@ function injectDismissedReset() {
       if (!confirm(`Повернути всі сховані рекомендації (${cnt})?`)) return;
       if (typeof clearDismissed === 'function') clearDismissed();
       state.home.sig = null;
+      /* RECS_CACHE живе в IndexedDB через mcCacheSet — чистимо звідти */
+      if (typeof mcCacheDel === 'function') mcCacheDel(RECS_CACHE);
       try { localStorage.removeItem(RECS_CACHE); } catch {}
       btn.textContent = 'Повернути сховані рекомендації (0)';
       showSyncToast('✅ Сховані рекомендації повернуто');

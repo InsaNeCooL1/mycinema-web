@@ -102,4 +102,12 @@ describe('buildRails', () => {
     expect(out.hero).toBeNull();
     expect(Array.isArray(out.rails)).toBe(true);
   });
+
+  it('на вкладці «Фільми» у гілках немає серіалів з tvStreams', () => {
+    const tv = (i) => item(i, { key: 'tv-' + i, id: i, type: 'tv', title: 'Серіал ' + i });
+    const out = window.buildRails(baseOpts({
+      tvStreams: [{ id: 1, title: 'Netflix', items: Array.from({ length: 20 }, (_, i) => tv(300 + i)) }]
+    }));
+    out.rails.forEach(r => r.items.forEach(x => expect(x.type).toBe('movie')));
+  });
 });

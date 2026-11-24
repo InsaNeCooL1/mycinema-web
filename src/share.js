@@ -287,7 +287,6 @@ function renderObservatoryShareCanvas(tabId, format) {
     franchises: ['Мої франшизи', 'FRANCHISES'],
     countries:  ['Кіно-мандрівка', 'COUNTRIES'],
     streaming:  ['Де я дивлюсь', 'STREAMING PLATFORMS'],
-    elo:        ['Цар гори · Elo', 'ELO LEADERBOARD'],
     actors:     [state.stats.actorTab === 'count' ? 'Улюблені за переглядами' : 'Топ акторів за оцінкою', 'ACTORS RANKING'],
     genres:     ['Мої жанри', 'TOP GENRES'],
     detail:     ['Мій кінощоденник', 'LIBRARY SUMMARY']
@@ -325,15 +324,12 @@ function renderObservatoryShareCanvas(tabId, format) {
     rated.sort((a, b) => {
       const diff = b.r.avg - a.r.avg;
       if (Math.abs(diff) > 0.001) return diff;
-      const eloDiff = (b.item.elo || ELO_START) - (a.item.elo || ELO_START);
-      if (eloDiff !== 0) return eloDiff;
       return (b.item.updated || 0) - (a.item.updated || 0);
     });
     const rows = rated.slice(0, 10).map(({ item, r }) => {
       const typeLbl = item.type === 'tv' ? 'Серіал' : 'Фільм';
       const subParts = [typeLbl];
       if (item.year) subParts.push(item.year);
-      if (item.eloGames > 1) subParts.push(`Elo ${Math.round(item.elo || ELO_START)}`);
       const scoreColor = r.avg >= 8 ? '#9de5c3' : (r.avg >= 6 ? accent : '#ff5c5c');
       return {
         title: item.title || '',
@@ -629,15 +625,6 @@ function renderObservatoryShareCanvas(tabId, format) {
       pct: p.watched / maxW
     }));
     drawShareRankRows(ctx, rows, pad, bodyTop, bodyW, isStory ? 120 : 102, 18, theme, accent, rgb);
-  } else if (tabId === 'elo') {
-    const list = Object.values(lib).filter(x => x.eloGames && x.eloGames > 0).sort((a, b) => (b.elo || ELO_START) - (a.elo || ELO_START));
-    const maxRows = isStory ? 10 : 7;
-    const rows = list.slice(0, maxRows).map(x => ({
-      title: x.title,
-      sub: `${x.eloGames} ${plural(x.eloGames, 'матч', 'матчі', 'матчів')}`,
-      right: String(Math.round(x.elo || ELO_START))
-    }));
-    drawShareRankRows(ctx, rows, pad, bodyTop, bodyW, isStory ? 110 : 94, 16, theme, accent, rgb);
   } else if (tabId === 'actors') {
     const { actors: actorMap } = computeActorProfiles();
     const byCount = state.stats.actorTab === 'count';

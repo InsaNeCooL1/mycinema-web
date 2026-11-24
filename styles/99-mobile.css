@@ -15,8 +15,10 @@
   #results { padding: 0 12px 12px; }
 }
 
-/* Базовий стан: мобільна оболонка схована на десктопі */
-#mob-topbar, #mob-bottom { display: none; }
+/* Базовий стан: мобільна оболонка схована на десктопі.
+   П_search-page і шит мають бути приховані ЗАВЖДИ — інакше на десктопі
+   угорі сторінки видно «← Назад» і біле поле пошуку. */
+#mob-topbar, #mob-bottom, #mob-sheet-backdrop, #mob-search-page { display: none; }
 
 /* ---------- Топ-бар <768px ---------- */
 @media (max-width: 767px) {
@@ -30,11 +32,16 @@
     /* inline box.style.padding з home.js перекриває звичайне правило — посилюємо */
     padding-bottom: calc(var(--mob-bottom-h) + var(--mob-safe-bottom)) !important;
   }
+  /* Звичайна сітка — 2 колонки, без старої 8-колонкової заглушки */
+  #results .home-grid:not(.recs-strip) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 12px;
+  }
 
   /* ---- Мобільний топ-бар ---- */
   #mob-topbar {
     position: fixed; top: 0; left: 0; right: 0;
-    z-index: 1090;
+    z-index: 1210;
     height: calc(var(--mob-top-h) + var(--mob-safe-top));
     padding: 0 0 0 16px;
     background: transparent;
@@ -109,7 +116,7 @@
   .mob-sheet-watch.active { color: var(--mint); border-color: rgba(157, 229, 195, .45); background: rgba(157, 229, 195, .12); box-shadow: 0 0 10px rgba(157, 229, 195, .2); }
 
   /* ---- Боттом-шити (generic) ---- */
-  #mob-sheet-backdrop { position: fixed; inset: 0; z-index: 1200; display: none; }
+  #mob-sheet-backdrop { position: fixed; inset: 0; z-index: 1220; display: none; }
   #mob-sheet-backdrop.open { display: block; }
   .mob-sheet-panel {
     position: fixed; left: 0; right: 0; bottom: 0;
@@ -262,6 +269,7 @@
   }
   /* Головний постер: вужчий і нижчий, без «набанатої» висоти 9/16 */
   .mobile-hero {
+    position: relative;
     width: min(72vw, 270px); max-width: 270px;
     aspect-ratio: 3 / 4; border-radius: 14px; margin: 4px auto 0;
     overflow: hidden;
@@ -281,7 +289,6 @@
   .mobile-hero .mob-floats-tray {
     display: flex; justify-content: flex-end; padding: 10px 8px 0 0;
   }
-  .mobile-hero .hero-fav-btn { top: auto; right: 8px; bottom: 8px; }
 
   /* Ratings mobile: компакт, значки-смуги */
   .mobile-score .light { margin: 3px; width: 32px; height: 32px; }
@@ -299,7 +306,7 @@
   .mobile-tabs-wrap .card-tab-content { padding: 0 8px; }
 
   /* Person/company mobile: горизонтальна шапка */
-  #card.is-person .card-scroll { flex-direction: row; gap: 14px; }
+  #card.is-person .card-scroll { display: flex; flex-direction: row; gap: 14px; }
   #card.is-person .person-header { flex-direction: row; align-items: center; gap: 14px; }
   #card.is-person .person-photo { width: 92px; height: 92px; }
 
@@ -354,8 +361,6 @@
   }
 
   /* Card glass floats */
-  .mobile-hero { position: relative; }
-  .mobile-hero .mob-floats-tray { display: flex; justify-content: flex-end; padding: 10px 10px 0 0; }
   .mobile-hero .hero-fav-btn { position: static; }
   .mobile-actions { margin-top: 8px; }
 
@@ -373,7 +378,7 @@
 
   /* Mobile search page */
   #mob-search-page {
-    position: fixed; inset: 0; z-index: 1101; background: var(--bg-0);
+    position: fixed; inset: 0; z-index: 1300; background: var(--bg-0);
     display: none; flex-direction: column;
     -webkit-overflow-scrolling: touch;
   }

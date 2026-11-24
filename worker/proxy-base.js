@@ -32,50 +32,7 @@ const ALLOWED_DOMAIN_SUFFIXES = [
   'uakinogo.is',
   'kinogo.is',
 
-  // Filmix mobile API v2 + відео-CDN
-  'filmixapp.cyou',
-  'coldcdn.xyz',
-  'sundb.nl',
-  'filmix.fm',
-  'filmix.my',
-  'filmix.ws',
-  'filmix.pics',
-  'filmix.vip',
-  'filmix.one',
-  // реальні CDN-хости з player_links (перевірено на живому /api/v2/post/)
-  'cdnsqu.com',
-  'werkecdn.me',
 ];
-
-const FILMIX_CDN_SUFFIXES = [
-  'coldcdn.xyz', 'sundb.nl', 'filmix.fm', 'filmix.my', 'filmix.ws',
-  'filmix.pics', 'filmix.vip', 'filmix.one', 'cdnsqu.com', 'werkecdn.me',
-];
-function isFilmixApi(host) { return String(host).toLowerCase().endsWith('filmixapp.cyou'); }
-function isFilmixCdn(host) {
-  const h = String(host).toLowerCase();
-  return FILMIX_CDN_SUFFIXES.some((d) => h === d || h.endsWith('.' + d));
-}
-
-/* Відносні URI в m3u8 інакше резолвляться проти origin'у воркера */
-function rewriteM3U8(text, baseUrl, referer, workerOrigin) {
-  function proxied(u) {
-    const p = new URL(workerOrigin);
-    p.search = '';
-    p.searchParams.set('url', u);
-    if (referer) p.searchParams.set('referer', referer);
-    return p.toString();
-  }
-  return String(text || '').split(/\r?\n/).map(function (line) {
-    const s = line.trim();
-    if (!s || s.charAt(0) === '#') return line;
-    let abs;
-    try {
-      abs = /^https?:\/\//i.test(s) ? s : new URL('./' + s.replace(/^\.\//, ''), baseUrl).toString();
-    } catch (e) { return line; }
-    return proxied(abs);
-  }).join('\n');
-}
 
 function isAllowedHost(host) {
   const h = host.toLowerCase();
@@ -144,19 +101,11 @@ export default {
       'Accept': '*/*',
       'Accept-Language': 'uk-UA,uk;q=0.9,en-US;q=0.8,en;q=0.7',
     };
-    if (isFilmixApi(t.hostname)) {
-      // Мобільний API Filmix приймає тільки okhttp UA і забороняє браузерні
-      // Origin/Referer — інакше 400 або бан.
-      headers['User-Agent'] = 'okhttp/3.10.0';
-      delete headers['Origin'];
-      delete headers['Referer'];
-    } else {
-      if (referer) headers['Referer'] = referer;
-      if (customOrigin) {
-        headers['Origin'] = customOrigin;
-      } else if (request.method === 'POST' && referer) {
-        try { headers['Origin'] = new URL(referer).origin; } catch {}
-      }
+    if (referer) headers['Referer'] = referer;
+    if (customOrigin) {
+      headers['Origin'] = customOrigin;
+    } else if (request.method === 'POST' && referer) {
+      try { headers['Origin'] = new URL(referer).origin; } catch {}
     }
     const xrw = request.headers.get('X-Requested-With');
     if (xrw) headers['X-Requested-With'] = xrw;
@@ -176,14 +125,13 @@ export default {
 
     try {
       const res = await fetch(t.toString(), init);
-      if (isFilmixCdn(t.hostname) &&
-          (/\.m3u8(\?|$)/i.test(t.pathname + t.search) || /mpegurl/i.test(res.headers.get('Content-Type') || ''))) {
-        const body = rewriteM3U8(
-          await res.text(), t.toString(), referer || '', new URL(request.url).origin
-        );
-        return new Response(body, {
-          status: res.status,
-          headers: { ...CORS_HEADERS, 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'no-store' },
+      /* DLE-каталог KinoUKR відповідає 404 з повноцінною HTML-сторінкою,
+         коли тег xfsearch не знайдено. Для клієнта це порожній результат,
+         а не помилка проксі — повертаємо тіло зі статусом 200. */
+      if (res.status === 404 && t.hostname.endsWith('kinoukr.tv') && /\/xfsearch\//.test(t.pathname)) {
+        return new Response(await res.text(), {
+          status: 200,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'text/html; charset=UTF-8', 'Cache-Control': 'no-store' },
         });
       }
       if (isChallenge(res)) {

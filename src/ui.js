@@ -11,7 +11,7 @@ function closeSidebar() {
 }
 
 document.addEventListener('pointerdown', (e) => {
-  const btn = e.target.closest('.nav-item, .nav-group-btn, .search-filter-btn, .filter-btn, .home-tab, .card-tab, .btn, .card-x, .filter-actions button, .query-bar button, .trailer-btn, .auth-btn, .onb-btn, .game-btn, .login-btn-side, .logout-btn-side, .season-tab-btn, .settings-btn, .cast-loader-btn, .mood-pill, .taste-summary');
+  const btn = e.target.closest('.nav-item, .nav-group-btn, .search-filter-btn, .filter-btn, .home-tab, .card-tab, .btn, .card-x, .filter-actions button, .query-bar button, .trailer-btn, .auth-btn, .onb-btn, .login-btn-side, .logout-btn-side, .season-tab-btn, .settings-btn, .cast-loader-btn, .mood-pill, .taste-summary');
   if (!btn) return;
   const rect = btn.getBoundingClientRect();
   const size = Math.max(rect.width, rect.height) * 2.2;

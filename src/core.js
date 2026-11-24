@@ -5,7 +5,7 @@ const _idbMem = new Map();
 const _IDB_NAME = 'mycinema_cache_db';
 const _IDB_STORE = 'kv';
 const _IDB_KEYS = [
-  typeof RECS_CACHE !== 'undefined' ? RECS_CACHE : 'mycinema.recs.v7',
+  typeof RECS_CACHE !== 'undefined' ? RECS_CACHE : 'mycinema.recs.v8',
   'mycinema.home.general.v7',
   'mycinema.metaCache.v2',
   'mycinema.colCache.v1',
@@ -177,7 +177,7 @@ let lib = load();
 let _dirtyItems = new Set();
 let _saveTimer = null;
 let actorAdjust = (() => { try { return JSON.parse(localStorage.getItem(ACTOR_ADJUST_KEY)) || {}; } catch { return {}; } })();
-const VALID_TABS = new Set(['streamings', 'settings', 'home', 'watching', 'watched', 'planned', 'dropped', 'favorites', 'notes', 'top', 'calendar', 'statistics', 'game']);
+const VALID_TABS = new Set(['streamings', 'settings', 'home', 'watching', 'watched', 'planned', 'dropped', 'favorites', 'notes', 'top', 'calendar', 'statistics']);
 let _savedTab = 'home';
 try {
   const t = localStorage.getItem('mycinema.activeTab');
@@ -197,7 +197,6 @@ let state = {
     mode: localStorage.getItem('mycinema.home.mode') || 'balance', /* FIX-MODE-PERSIST */
     tasteExpanded: false 
   },
-  game: { active: false, type: 'movie', round: 0, totalRounds: 20, champion: null, challenger: null, history: [], finished: false, pool: [], seen: new Set(), usedPages: new Set() },
   stats: { tab: 'taste', actorTab: 'rating', castLoading: false, castProgress: { done: 0, total: 0 } },
   librarySearch: '', librarySort: localStorage.getItem('mycinema.librarySort') || 'updated', /* FIX-SORT-PERSIST */
   calendarMonth: null, calendarStatus: 'all'
@@ -747,7 +746,6 @@ function _fieldTs(item, field) {
   /* легасі-поля, які вже мають власні таймстемпи */
   if (field === 'status') return Number(item.statusDate) || 0;
   if (field === 'ratings') return Number(item.ratingUpdated) || 0;
-  if (field === 'elo') return Number(item.eloUpdated) || 0;
   return Number(item.updated) || 0;
 }
 
@@ -790,11 +788,6 @@ function _mergeItem(a, b) {
     out.ratingUpdated = _fieldTs(src, 'ratings') || out.updated || Date.now();
     ft.ratings = out.ratingUpdated;
   }
-  if ('elo' in out && typeof out.elo === 'number') {
-    const src = _valEq(out.elo, a.elo) ? a : b;
-    out.eloUpdated = _fieldTs(src, 'elo') || ft.elo || 0;
-  }
-
   /* Оцінки сезонів — окремо по кожному сезону. */
   const sr = {}, srTs = {};
   for (const s of new Set([...Object.keys(a.seasonRatings || {}), ...Object.keys(b.seasonRatings || {})])) {
@@ -1071,7 +1064,8 @@ async function reconcileWithCloud() {
   // Воскрешені тайтли (новіша правка після tombstone) лишаються в хмарі.
   const deletedKeys = Object.keys(libTombstones).filter(k => !lib[k]);
   if (deletedKeys.length > 0) {
-    await window.supabase.from('user_library').delete().eq('user_id', uid).in('item_key', deletedKeys);
+    const { error: errDel } = await window.supabase.from('user_library').delete().eq('user_id', uid).in('item_key', deletedKeys);
+    if (errDel) throw errDel;
   }
 
   const { error: errProf } = await window.supabase.from('profiles').upsert({
@@ -1104,7 +1098,10 @@ function saveToCloud(isManual = false) {
     try {
       setSyncStatus('saving', isManual ? 'Синхронізую...' : 'Зберігаю...');
       const changed = await reconcileWithCloud();
-      if (changed) refresh();
+      /* Фоновий синк не має скидати поле, в яке користувач зараз друкує */
+      const tag = (document.activeElement && document.activeElement.tagName) || '';
+      const onScrolledHome = typeof state !== 'undefined' && state.tab === 'home' && window.scrollY > 200;
+      if (changed && !/^(INPUT|TEXTAREA|SELECT)$/.test(tag) && !(onScrolledHome && !isManual)) refresh();
       setSyncStatus('saved', isManual ? '✓ Синхронізовано' : '✓');
       return true;
     } catch (e) { 
@@ -1306,7 +1303,14 @@ function saveDismissed() {
 function isDismissed(key) { return !!dismissedRecs[key]; }
 function dismissRec(item) {
   if (!item || !item.key) return;
-  dismissedRecs[item.key] = { ts: Date.now(), genres: item.genres || [], title: item.title || '' };
+  dismissedRecs[item.key] = {
+    ts: Date.now(),
+    genres: item.genres || [],
+    title: item.title || '',
+    reasonTags: (item._reasonTags || []).slice(0, 6),
+    directors: (item.directors || []).map(d => d.id || d).slice(0, 4),
+    cast: (item.cast || []).map(c => c.id || c).slice(0, 4)
+  };
   logActivity({ cat: 'dismiss', sub: 'dismiss', icon: '🙈', text: 'Сховано з рекомендацій', item });
   saveDismissed();
   clearTimeout(_saveTimer);
@@ -1330,11 +1334,30 @@ function clearDismissed() {
   _saveTimer = setTimeout(saveToCloud, 800);
 }
 
-// ============ ELO ============
-function getElo(item) {
-  if (!item || !item.key) return ELO_START;
-  const saved = lib[item.key];
-  return (saved && typeof saved.elo === 'number') ? saved.elo : ELO_START;
+/* Одноразова міграція після видалення «Цар гори»: прибираємо мертві поля
+   і фантомні записи (status:null), створені матчами. */
+function migrateLegacyElo() {
+  let dirty = false;
+  for (const [k, x] of Object.entries(lib)) {
+    if (!x) continue;
+    const hadElo = ('elo' in x) || ('eloGames' in x) || ('eloUpdated' in x);
+    if (hadElo) {
+      delete x.elo; delete x.eloGames; delete x.eloUpdated;
+      if (x._fieldTs) delete x._fieldTs.elo;
+      dirty = true;
+    }
+    const hasRatings = !!(x.ratings && Object.values(x.ratings).some(v => v > 0));
+    const hasSeasons = !!(x.seasonRatings && Object.keys(x.seasonRatings).length);
+    const hasNotes = !!(x.notes && x.notes.trim()) || !!(x.notesHistory && x.notesHistory.length);
+    if (hadElo && !x.status && !hasRatings && !hasSeasons && !hasNotes && !x.favorite &&
+        !(x.watchedEpisodes || []).length && !(x.rewatches > 0)) {
+      delete lib[k];
+      libTombstones[k] = Date.now();
+      try { localStorage.setItem(LS_DEL, JSON.stringify(libTombstones)); } catch {}
+    }
+  }
+  try { localStorage.removeItem('kingOfTheHillHistory'); } catch {}
+  if (dirty) { saveLocalOnly(); }
 }
 
 function preserveItemTimestamps(entry) {
@@ -1360,56 +1383,6 @@ function preserveItemTimestamps(entry) {
   }
 }
 
-function recordEloMatch(winner, loser) {
-  if (!winner || !loser || !winner.key || !loser.key) return null;
-
-  const ensureEntry = (item) => {
-    if (!lib[item.key]) {
-      lib[item.key] = {
-        ...item,
-        status: null,
-        ratings: null,
-        watchedEpisodes: [],
-        createdAt: Date.now()
-      };
-    }
-    return lib[item.key];
-  };
-
-  const w = ensureEntry(winner);
-  const l = ensureEntry(loser);
-
-  const wElo = typeof w.elo === 'number' ? w.elo : ELO_START;
-  const lElo = typeof l.elo === 'number' ? l.elo : ELO_START;
-
-  const expectedWin = 1 / (1 + Math.pow(10, (lElo - wElo) / 400));
-  const delta = Math.round(ELO_K * (1 - expectedWin));
-
-  const eloNow = Date.now();
-  preserveItemTimestamps(w);
-  preserveItemTimestamps(l);
-
-  /* ELO_AUTONOMY_APPLIED */
-  w.elo = Math.round(wElo + delta);
-  _dirtyItems.add(w.key);
-  w.eloGames = (w.eloGames || 0) + 1;
-  w.eloUpdated = eloNow;
-  w._fieldTs = { ...(w._fieldTs || {}), elo: eloNow };
-  // w.updated НЕ чіпаємо, щоб не збивати дату перегляду і сортування бібліотеки
-
-  l.elo = Math.round(lElo - delta);
-  _dirtyItems.add(l.key);
-  l.eloGames = (l.eloGames || 0) + 1;
-  l.eloUpdated = eloNow;
-  l._fieldTs = { ...(l._fieldTs || {}), elo: eloNow };
-  // l.updated НЕ чіпаємо
-
-  // Перемоги Elo більше не засмічують загальний журнал дій
-  save();
-  return { delta, winnerElo: w.elo, loserElo: l.elo };
-}
-
-
 // [SAFE-A11Y] Локальне керування клавіатурою (без синхронізації в хмару)
 const KBD_NAV_KEY = 'mycinema.kbdNav';
 function isKbdNavEnabled() {
@@ -1431,7 +1404,7 @@ function setKbdNavEnabled(on) {
 (function initSafeA11y() {
   const selectors = [
     '.item', '.rec-card', '.light', '.actor-tile', '.episode-body',
-    '.elo-row', '.actor-rank-item', '.franchise-head', '.series-prog-row',
+    '.rank-row', '.actor-rank-item', '.franchise-head', '.series-prog-row',
     '.mood-pill', '.card-tab', '.top-number', '.episode-poster-wrap'
   ].join(', ');
 

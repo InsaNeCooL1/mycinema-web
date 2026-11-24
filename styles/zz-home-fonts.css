@@ -171,10 +171,10 @@
 #results .actor-rank-value { font-size: calc(1.1 * 15px); }
 #results .cast-loader-text { font-size: calc(1.1 * 12px); }
 #results .cast-loader-btn { font-size: calc(1.1 * 13px); }
-#results .elo-rank { font-size: calc(1.1 * 13px); }
-#results .elo-title { font-size: calc(1.1 * 13px); }
-#results .elo-games { font-size: calc(1.1 * 10.5px); }
-#results .elo-value { font-size: calc(1.1 * 14px); }
+#results .rank-rank { font-size: calc(1.1 * 13px); }
+#results .rank-title { font-size: calc(1.1 * 13px); }
+#results .rank-games { font-size: calc(1.1 * 10.5px); }
+#results .rank-value { font-size: calc(1.1 * 14px); }
 #results .insight-label { font-size: calc(1.1 * 10px); }
 #results .insight-text { font-size: calc(1.1 * 14px); }
 #results .trend-labels { font-size: calc(1.1 * 12px); }
@@ -193,7 +193,7 @@
 #results .history-item { font-size: calc(1.1 * 12px); }
 #results .history-item .hi-title { font-size: calc(1.1 * 13px); }
 #results .history-item .hi-meta { font-size: calc(1.1 * 10.5px); }
-#results .elo-delta { font-size: calc(1.1 * 11px); }
+#results .rank-delta { font-size: calc(1.1 * 11px); }
 #results .game-over h2 { font-size: calc(1.1 * 28px); }
 #results .calendar-select { font-size: calc(1.1 * 14px); }
 #results .timeline-date { font-size: calc(1.1 * 13px); }
@@ -213,7 +213,7 @@
 #results .recs-mode-pill { font-size: calc(1.1 * 12.5px); }
 #results .roulette-btn { font-size: calc(1.1 * 12.5px); }
 #results .series-prog-val { font-size: calc(1.1 * 12px); }
-#results .game-source-pill { font-size: calc(1.1 * 13px); }
+#results .seg-pill { font-size: calc(1.1 * 13px); }
 #results .cal-best-btn { font-size: calc(1.1 * 12.5px); }
 #results .person-lib-badge { font-size: calc(1.1 * 12px); }
 #results .person-bio-source { font-size: calc(1.1 * 11px); }
@@ -294,3 +294,4 @@
 #results /* FIX-OBS-SHARE-CSS */
 .obs-share-btn { font-size: calc(1.1 * 13px); }
 #results .share-modal-head h3 { font-size: calc(1.1 * 17px); }
+

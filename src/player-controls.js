@@ -167,14 +167,7 @@
     ['mousemove', 'keydown'].forEach(function (ev) {
       doc.addEventListener(ev, show, { passive: true });
     });
-    video.addEventListener('play', syncPlay);
-    video.addEventListener('pause', syncPlay);
-    video.addEventListener('timeupdate', syncTime);
-    video.addEventListener('progress', syncTime);
-    video.addEventListener('loadedmetadata', syncTime);
-    video.addEventListener('volumechange', syncVol);
-
-    doc.addEventListener('keydown', function (e) {
+    var onDocKeydown = function (e) {
       if (destroyed) return;
       var tag = (e.target && e.target.tagName) || '';
       if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
@@ -183,7 +176,15 @@
       else if (e.key === 'ArrowLeft') { e.preventDefault(); try { video.currentTime -= 5; } catch (er) {} show(); }
       else if (e.key.toLowerCase() === 'f' && opts.onFullscreen) { e.preventDefault(); opts.onFullscreen(); }
       else if (e.key.toLowerCase() === 'm' && opts.onMenu) { e.preventDefault(); opts.onMenu(); }
-    });
+    };
+    doc.addEventListener('keydown', onDocKeydown);
+    video.addEventListener('play', syncPlay);
+    video.addEventListener('pause', syncPlay);
+    video.addEventListener('timeupdate', syncTime);
+    video.addEventListener('progress', syncTime);
+    video.addEventListener('loadedmetadata', syncTime);
+    video.addEventListener('volumechange', syncVol);
+
 
     setTitle(opts.title);
     syncPlay(); syncTime(); syncVol(); show();
@@ -196,6 +197,11 @@
       destroy: function () {
         destroyed = true;
         clearTimeout(idleTimer);
+        if (doc) {
+          doc.removeEventListener('mousemove', show, { passive: true });
+          doc.removeEventListener('keydown', show, { passive: true });
+          doc.removeEventListener('keydown', onDocKeydown);
+        }
         if (root.parentNode) root.parentNode.removeChild(root);
       }
     };

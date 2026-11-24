@@ -24,11 +24,11 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { overscroll-behavior: auto; overflow-x: hidden; max-width: 100vw; }
+html { overscroll-behavior: auto; max-width: 100vw; }
 
 body {
   font-family: var(--sans); background: var(--bg-0); color: var(--text);
-  line-height: 1.5; overflow-x: hidden; min-height: 100vh;
+  line-height: 1.5; overflow-x: clip; max-width: 100vw; min-height: 100vh;
   padding-top: 0px; padding-bottom: 0px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -245,6 +245,7 @@ input#q::placeholder { color: var(--text-dim); }
 .query-bar span { flex: 1; color: var(--text-secondary); }
 .query-bar button { background: var(--bg-3); color: var(--text); padding: 6px 12px; border-radius: var(--r-sm); font-size: 12px; }
 .avail-empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
+
 
 
 
@@ -799,16 +800,16 @@ html.mc-kbd .home-inline-pill:focus-visible {
 .cast-loader-btn { padding: 10px 20px; border-radius: var(--r-sm); background: var(--accent); color: var(--accent-fg); font-size: 13px; font-weight: 800; }
 .cast-loader-btn:disabled { background: var(--bg-3); color: var(--text-dim); cursor: not-allowed; }
 
-.elo-lb { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
-.elo-row { display: flex; gap: 10px; align-items: center; padding: 8px 12px; background: var(--bg-1); border-radius: var(--r-sm); cursor: pointer; transition: .15s; border: 1px solid rgba(var(--white-rgb), .03); }
-.elo-row:hover { background: var(--bg-2); }
-.elo-rank { font-family: var(--mono); font-weight: 800; font-size: 13px; color: var(--accent); min-width: 24px; text-align: center; }
-.elo-poster { width: 32px; height: 48px; border-radius: 6px; object-fit: cover; background: var(--bg-3); flex-shrink: 0; }
-.elo-info { flex: 1; min-width: 0; }
-.elo-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.elo-games { font-size: 10.5px; color: var(--text-muted); font-family: var(--mono); margin-top: 1px; }
-.elo-value { font-family: var(--mono); font-weight: 800; font-size: 14px; color: var(--accent); flex-shrink: 0; }
-.elo-value.top { color: var(--mint); }
+.rank-lb { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.rank-row { display: flex; gap: 10px; align-items: center; padding: 8px 12px; background: var(--bg-1); border-radius: var(--r-sm); cursor: pointer; transition: .15s; border: 1px solid rgba(var(--white-rgb), .03); }
+.rank-row:hover { background: var(--bg-2); }
+.rank-rank { font-family: var(--mono); font-weight: 800; font-size: 13px; color: var(--accent); min-width: 24px; text-align: center; }
+.rank-poster { width: 32px; height: 48px; border-radius: 6px; object-fit: cover; background: var(--bg-3); flex-shrink: 0; }
+.rank-info { flex: 1; min-width: 0; }
+.rank-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-games { font-size: 10.5px; color: var(--text-muted); font-family: var(--mono); margin-top: 1px; }
+.rank-value { font-family: var(--mono); font-weight: 800; font-size: 14px; color: var(--accent); flex-shrink: 0; }
+.rank-value.top { color: var(--mint); }
 
 .insight-card { background: linear-gradient(135deg, rgba(var(--accent-rgb), .08), rgba(197, 163, 255, .05)); border: 1px solid rgba(var(--accent-rgb), .15); border-radius: var(--r-md); padding: 14px 16px; margin-bottom: 12px; }
 .insight-label { font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; color: var(--accent); text-transform: uppercase; margin-bottom: 6px; }
@@ -825,45 +826,6 @@ html.mc-kbd .home-inline-pill:focus-visible {
 .trend-legend span::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
 .trend-legend .old::before { background: rgba(var(--white-rgb), .15); }
 .trend-legend .new::before { background: var(--accent); }
-
-.game-container { max-width: 720px; margin: 0 auto; padding: 16px; }
-.game-header { text-align: center; margin-bottom: 20px; }
-.game-title { font-family: var(--serif); font-size: 28px; font-weight: 400; font-style: italic; margin: 0 0 8px; letter-spacing: -.5px; }
-.game-subtitle { color: var(--text-muted); font-size: 13px; margin: 0; font-family: var(--mono); }
-.game-stats { display: flex; justify-content: center; gap: 20px; margin: 16px 0; font-size: 12px; color: var(--text-secondary); font-family: var(--mono); }
-.game-stats span { font-weight: 800; color: var(--accent); font-size: 14px; }
-.game-arena { display: flex; flex-direction: column; gap: 14px; margin: 20px 0; }
-.game-vs-label { text-align: center; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 3px; margin: 4px 0; font-family: var(--mono); position: relative; }
-.game-vs-label::before, .game-vs-label::after { content: ''; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--bg-3); }
-.game-vs-label::before { left: 0; }
-.game-vs-label::after { right: 0; }
-.game-card { background: linear-gradient(135deg, var(--bg-1), var(--bg-2)); border-radius: var(--r-md); overflow: hidden; cursor: pointer; transition: .2s; display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 10px; border: 1px solid rgba(var(--white-rgb), .04); position: relative; }
-.game-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(var(--accent-rgb), .15); border-color: rgba(var(--accent-rgb), .3); }
-.game-card-poster { width: 80px; height: 120px; object-fit: cover; border-radius: 8px; background: var(--bg-3); flex-shrink: 0; }
-.game-card-body { flex: 1; min-width: 0; }
-.game-card-title { font-size: 15px; font-weight: 800; line-height: 1.3; margin-bottom: 4px; }
-.game-card-meta { font-size: 11.5px; color: var(--text-muted); font-family: var(--mono); }
-.game-card-elo { font-family: var(--mono); font-size: 11px; color: var(--accent); font-weight: 800; margin-top: 4px; display: inline-block; padding: 2px 8px; background: rgba(var(--accent-rgb), .1); border-radius: var(--r-xs); }
-.game-card-crown { font-size: 22px; margin-left: auto; padding-right: 8px; filter: drop-shadow(0 0 8px rgba(var(--accent-rgb), .6)); }
-.game-btn { width: 100%; padding: 12px; border-radius: var(--r-sm); font-size: 14px; font-weight: 600; transition: .2s; margin-bottom: 8px; }
-.game-btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: var(--accent-fg); box-shadow: 0 4px 20px rgba(var(--accent-rgb), .3); }
-.game-btn.primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(var(--accent-rgb), .4); }
-.game-btn.secondary { background: var(--bg-3); color: var(--text); }
-.game-btn.secondary:hover { background: var(--bg-4); }
-.game-btn.danger { background: rgba(255, 92, 92, .15); color: var(--danger); }
-.game-btn.danger:hover { background: var(--danger); color: #fff; }
-.game-history { margin-top: 30px; }
-.game-history h3 { font-size: 16px; margin-bottom: 12px; font-family: var(--serif); }
-.history-item { display: flex; gap: 10px; padding: 10px; background: var(--bg-1); border-radius: var(--r-sm); margin-bottom: 8px; font-size: 12px; align-items: center; border: 1px solid rgba(var(--white-rgb), .03); }
-.history-item .hi-poster { width: 40px; height: 60px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--bg-3); }
-.history-item .hi-info { flex: 1; min-width: 0; }
-.history-item .hi-title { font-weight: 600; font-size: 13px; }
-.history-item .hi-meta { color: var(--text-muted); font-size: 10.5px; margin-top: 2px; font-family: var(--mono); }
-.elo-delta { font-family: var(--mono); font-size: 11px; font-weight: 800; padding: 2px 6px; border-radius: 6px; flex-shrink: 0; }
-.elo-delta.up { background: rgba(157, 229, 195, .15); color: var(--mint); }
-.game-over { text-align: center; padding: 40px 16px; }
-.game-over h2 { font-family: var(--serif); font-size: 28px; margin-bottom: 8px; font-style: italic; }
-.game-over p { color: var(--text-muted); margin-bottom: 20px; }
 
 /* =========================================
    MEDIA QUERIES (DESKTOP) - УНІФІКОВАНО
@@ -1105,6 +1067,7 @@ html.mc-kbd .home-inline-pill:focus-visible {
   .mcm-snow::after { animation: none; }
 }
 /* === /MCM Snow v3 === */
+
 
 
 
@@ -1632,7 +1595,7 @@ html.mc-kbd .home-inline-pill:focus-visible {
 .heatmap-cell.lvl-3 { background: rgba(var(--accent-rgb), .76); }
 .heatmap-cell.lvl-4 { background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb), .45); }
 
-.game-source-switch {
+.seg-switch {
   display: flex;
   gap: 6px;
   padding: 4px;
@@ -1641,7 +1604,7 @@ html.mc-kbd .home-inline-pill:focus-visible {
   border: 1px solid rgba(var(--white-rgb), .06);
   margin-bottom: 14px;
 }
-.game-source-pill {
+.seg-pill {
   flex: 1;
   padding: 9px 12px;
   border-radius: var(--r-sm);
@@ -1650,8 +1613,8 @@ html.mc-kbd .home-inline-pill:focus-visible {
   color: var(--text-muted);
   transition: .2s;
 }
-.game-source-pill:hover { color: var(--text); }
-.game-source-pill.active {
+.seg-pill:hover { color: var(--text); }
+.seg-pill.active {
   background: rgba(var(--accent-rgb), .18);
   color: var(--accent);
 }
@@ -2536,16 +2499,13 @@ input#q::-webkit-search-cancel-button {
 .home-hero-inner.swap .home-hero-why { animation-delay: .1s; }
 .home-hero-inner.swap .home-hero-actions { animation-delay: .15s; }
 
-/* Поява гілок при скролі */
-.rail-section {
-  opacity: 0;
-  transform: translateY(22px);
-  transition: opacity .55s ease, transform .55s cubic-bezier(.2,.8,.2,1);
-}
+/* Полиці завжди видимі: анімація появи ламала швидкий скрол
+   (секції висіли opacity:0 і стрибкоподібно міняли висоту документа). */
+.rail-section { margin-bottom: 30px; }
 .rail-section.revealed { opacity: 1; transform: none; }
 
-/* Додатковий простір згори, щоб збільшена картка не обрізалась */
-.rail-strip { padding: 24px 2px 14px; margin-top: -12px; }
+/* Тримаємо реальну висоту полиці до заповнення, щоб скрол не «провалювався» */
+.rail-strip { min-height: 230px; padding: 24px 2px 14px; margin-top: -12px; }
 .rail-strip .rec-card {
   transform-origin: 50% 88%;
   transition: transform .32s cubic-bezier(.2,.8,.2,1), filter .32s ease;
@@ -3217,14 +3177,6 @@ input#q::-webkit-search-cancel-button {
     margin-right: 0;
   }
 
-  /* Сітка на 8 колонок */
-  body #results .home-grid {
-    display: grid;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-    gap: 20px 16px;
-    width: 100%;
-  }
-
   /* [LAYOUT] Блок «Для тебе» — окрема виділена панель із горизонтальною стрічкою. */
   .home-recs-panel {
     background: linear-gradient(135deg, rgba(var(--accent-rgb), .05), rgba(22, 20, 27, .55));
@@ -3333,7 +3285,7 @@ img {
   -webkit-user-select: none;
 }
 .rec-card, .item, .filmography-card, .similar-card, .actor-tile,
-.episode-poster-wrap, .franchise-head, .series-prog-row, .elo-row,
+.episode-poster-wrap, .franchise-head, .series-prog-row, .rank-row,
 .actor-rank-item, .nav-item, .nav-group-btn, .card-tab, .mood-pill,
 .recs-mode-pill, .home-tab, .filter-btn, button {
   -webkit-touch-callout: none;
@@ -3354,6 +3306,7 @@ html.mc-kbd .card-tab:focus-visible {
   outline-offset: -2px;
   border-radius: var(--r-sm);
 }
+
 
 /* FIX-REACTIONS-MODAL */
 .ep-reaction-trigger {
@@ -3861,6 +3814,7 @@ html.mc-kbd .card-tab:focus-visible {
 /* [LAYOUT] Мобільний стиль: scopes через атрибут, щоб не впливати на десктоп. */
 
 
+
 /* Автогенеровано: шрифти вмісту головной +10%. Верхнє меню не зачіпаємо. */
 #results { font-size: calc(1.1 * 16px); }
 #results .hamburger { font-size: calc(1.1 * 22px); }
@@ -4034,10 +3988,10 @@ html.mc-kbd .card-tab:focus-visible {
 #results .actor-rank-value { font-size: calc(1.1 * 15px); }
 #results .cast-loader-text { font-size: calc(1.1 * 12px); }
 #results .cast-loader-btn { font-size: calc(1.1 * 13px); }
-#results .elo-rank { font-size: calc(1.1 * 13px); }
-#results .elo-title { font-size: calc(1.1 * 13px); }
-#results .elo-games { font-size: calc(1.1 * 10.5px); }
-#results .elo-value { font-size: calc(1.1 * 14px); }
+#results .rank-rank { font-size: calc(1.1 * 13px); }
+#results .rank-title { font-size: calc(1.1 * 13px); }
+#results .rank-games { font-size: calc(1.1 * 10.5px); }
+#results .rank-value { font-size: calc(1.1 * 14px); }
 #results .insight-label { font-size: calc(1.1 * 10px); }
 #results .insight-text { font-size: calc(1.1 * 14px); }
 #results .trend-labels { font-size: calc(1.1 * 12px); }
@@ -4056,7 +4010,7 @@ html.mc-kbd .card-tab:focus-visible {
 #results .history-item { font-size: calc(1.1 * 12px); }
 #results .history-item .hi-title { font-size: calc(1.1 * 13px); }
 #results .history-item .hi-meta { font-size: calc(1.1 * 10.5px); }
-#results .elo-delta { font-size: calc(1.1 * 11px); }
+#results .rank-delta { font-size: calc(1.1 * 11px); }
 #results .game-over h2 { font-size: calc(1.1 * 28px); }
 #results .calendar-select { font-size: calc(1.1 * 14px); }
 #results .timeline-date { font-size: calc(1.1 * 13px); }
@@ -4076,7 +4030,7 @@ html.mc-kbd .card-tab:focus-visible {
 #results .recs-mode-pill { font-size: calc(1.1 * 12.5px); }
 #results .roulette-btn { font-size: calc(1.1 * 12.5px); }
 #results .series-prog-val { font-size: calc(1.1 * 12px); }
-#results .game-source-pill { font-size: calc(1.1 * 13px); }
+#results .seg-pill { font-size: calc(1.1 * 13px); }
 #results .cal-best-btn { font-size: calc(1.1 * 12.5px); }
 #results .person-lib-badge { font-size: calc(1.1 * 12px); }
 #results .person-bio-source { font-size: calc(1.1 * 11px); }
@@ -4157,6 +4111,7 @@ html.mc-kbd .card-tab:focus-visible {
 #results /* FIX-OBS-SHARE-CSS */
 .obs-share-btn { font-size: calc(1.1 * 13px); }
 #results .share-modal-head h3 { font-size: calc(1.1 * 17px); }
+
 /* ========================================================= */
 /* CARD — Apple TV+ style: open page, sticky art, calm type    */
 /* ========================================================= */
@@ -4757,8 +4712,9 @@ body:not(.mc-search-open):not(.no-search) { padding-top: 68px; }
 .mood-chip-delta { font-size: 10.5px; font-weight: 600; color: rgb(var(--mood-rgb)); }
 
 #sidebar .sidebar-nav .nav-item[data-tab="home"],
-#sidebar .sidebar-nav .nav-item[data-tab="statistics"],
-#sidebar .sidebar-nav .nav-more-group { display: none !important; }
+#sidebar .sidebar-nav .nav-item[data-tab="statistics"] { display: none !important; }
+/* .nav-more-group керується інлайн у initPriorityNav(): прибраний !important
+   повертає пункти, перенесені в «Ще» на ширинах 768–1099px. */
 
 /* Пошук — окремий острівець перед навігацією */
 .search-island {
@@ -4918,8 +4874,7 @@ body:not(.mc-search-open):not(.no-search) { padding-top: 68px; }
 }
 @media (max-width: 1050px) {
   .utility-dock #sidebar-login-btn,
-  .utility-dock #sidebar-logout-btn,
-  .top-island { display: none; }
+  .utility-dock #sidebar-logout-btn { display: none; }
   .mood-chip-label, .mood-chip-delta { display: none; }
   .taste-top-btn.mood-chip { min-width: 0; padding: 4px 10px 4px 5px; gap: 6px; }
   .taste-top-avatar.mood-chip-avatar { width: 28px; height: 28px; }
@@ -4991,8 +4946,10 @@ body:has(.home-hero) { padding-top: 0 !important; }
   #results { padding: 0 12px 12px; }
 }
 
-/* Базовий стан: мобільна оболонка схована на десктопі */
-#mob-topbar, #mob-bottom { display: none; }
+/* Базовий стан: мобільна оболонка схована на десктопі.
+   П_search-page і шит мають бути приховані ЗАВЖДИ — інакше на десктопі
+   угорі сторінки видно «← Назад» і біле поле пошуку. */
+#mob-topbar, #mob-bottom, #mob-sheet-backdrop, #mob-search-page { display: none; }
 
 /* ---------- Топ-бар <768px ---------- */
 @media (max-width: 767px) {
@@ -5006,11 +4963,16 @@ body:has(.home-hero) { padding-top: 0 !important; }
     /* inline box.style.padding з home.js перекриває звичайне правило — посилюємо */
     padding-bottom: calc(var(--mob-bottom-h) + var(--mob-safe-bottom)) !important;
   }
+  /* Звичайна сітка — 2 колонки, без старої 8-колонкової заглушки */
+  #results .home-grid:not(.recs-strip) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 12px;
+  }
 
   /* ---- Мобільний топ-бар ---- */
   #mob-topbar {
     position: fixed; top: 0; left: 0; right: 0;
-    z-index: 1090;
+    z-index: 1210;
     height: calc(var(--mob-top-h) + var(--mob-safe-top));
     padding: 0 0 0 16px;
     background: transparent;
@@ -5085,7 +5047,7 @@ body:has(.home-hero) { padding-top: 0 !important; }
   .mob-sheet-watch.active { color: var(--mint); border-color: rgba(157, 229, 195, .45); background: rgba(157, 229, 195, .12); box-shadow: 0 0 10px rgba(157, 229, 195, .2); }
 
   /* ---- Боттом-шити (generic) ---- */
-  #mob-sheet-backdrop { position: fixed; inset: 0; z-index: 1200; display: none; }
+  #mob-sheet-backdrop { position: fixed; inset: 0; z-index: 1220; display: none; }
   #mob-sheet-backdrop.open { display: block; }
   .mob-sheet-panel {
     position: fixed; left: 0; right: 0; bottom: 0;
@@ -5238,6 +5200,7 @@ body:has(.home-hero) { padding-top: 0 !important; }
   }
   /* Головний постер: вужчий і нижчий, без «набанатої» висоти 9/16 */
   .mobile-hero {
+    position: relative;
     width: min(72vw, 270px); max-width: 270px;
     aspect-ratio: 3 / 4; border-radius: 14px; margin: 4px auto 0;
     overflow: hidden;
@@ -5257,7 +5220,6 @@ body:has(.home-hero) { padding-top: 0 !important; }
   .mobile-hero .mob-floats-tray {
     display: flex; justify-content: flex-end; padding: 10px 8px 0 0;
   }
-  .mobile-hero .hero-fav-btn { top: auto; right: 8px; bottom: 8px; }
 
   /* Ratings mobile: компакт, значки-смуги */
   .mobile-score .light { margin: 3px; width: 32px; height: 32px; }
@@ -5275,7 +5237,7 @@ body:has(.home-hero) { padding-top: 0 !important; }
   .mobile-tabs-wrap .card-tab-content { padding: 0 8px; }
 
   /* Person/company mobile: горизонтальна шапка */
-  #card.is-person .card-scroll { flex-direction: row; gap: 14px; }
+  #card.is-person .card-scroll { display: flex; flex-direction: row; gap: 14px; }
   #card.is-person .person-header { flex-direction: row; align-items: center; gap: 14px; }
   #card.is-person .person-photo { width: 92px; height: 92px; }
 
@@ -5330,8 +5292,6 @@ body:has(.home-hero) { padding-top: 0 !important; }
   }
 
   /* Card glass floats */
-  .mobile-hero { position: relative; }
-  .mobile-hero .mob-floats-tray { display: flex; justify-content: flex-end; padding: 10px 10px 0 0; }
   .mobile-hero .hero-fav-btn { position: static; }
   .mobile-actions { margin-top: 8px; }
 
@@ -5349,7 +5309,7 @@ body:has(.home-hero) { padding-top: 0 !important; }
 
   /* Mobile search page */
   #mob-search-page {
-    position: fixed; inset: 0; z-index: 1101; background: var(--bg-0);
+    position: fixed; inset: 0; z-index: 1300; background: var(--bg-0);
     display: none; flex-direction: column;
     -webkit-overflow-scrolling: touch;
   }
