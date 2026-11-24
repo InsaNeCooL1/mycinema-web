@@ -13,6 +13,7 @@ function openSettings() {
   renderSettingsSwatches();
   injectSnowToggle();
   injectExtraSettings();
+  if (typeof injectFilmixSettings === 'function') injectFilmixSettings();
   if (typeof injectDismissedReset === 'function') injectDismissedReset();
   openSettingsMenu();
 }

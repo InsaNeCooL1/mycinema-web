@@ -72,7 +72,7 @@
         wrap.append(img);
       }
       if (trailerList.length > 0) {
-        const playBtn = el('button', 'btn-play', '▶ Дивитись трейлер');
+        const playBtn = el('button', 'btn-play'); playBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5v14l11-7z"/></svg> Дивитись трейлер';
         playBtn.onclick = () => { ctx.playingTrailer = true; if (typeof refreshHeroInPlace === 'function') refreshHeroInPlace(ctx); else renderCard(); };
         wrap.append(playBtn);
       }
@@ -295,10 +295,10 @@
     const uaImdb = d.imdb_id || (d.external_ids && d.external_ids.imdb_id) || null;
     if (settings.enableStreams !== false) {
       const uakinoBtn = el('button', 'btn-uakino btn-watch-primary');
-      uakinoBtn.textContent = '▶ Дивитись';
+      uakinoBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5v14l11-7z"/></svg>▶ Дивитись';
       uakinoBtn.onclick = () => {
         if (typeof window.openStreamPicker === 'function') {
-          window.openStreamPicker(uaTitle, uaYear, uaType, uaImdb, uaOrigTitle, { key: r.key });
+          window.openStreamPicker(uaTitle, uaYear, uaType, uaImdb, uaOrigTitle, { key: r.key, tmdbId: r.id });
         } else {
           alert('Плеєр не завантажено. Онови сторінку (Ctrl+Shift+R).');
         }
@@ -330,7 +330,7 @@
       if (r.type === 'tv') {
         if (newStatus === 'watched') {
           newEps = [];
-          d.seasons.forEach(season => {
+          (d.seasons || []).forEach(season => {
             if (season.season_number !== 0) {
               const cnt = (season.episodes && season.episodes.length) ? season.episodes.length : (season.episode_count || 0);
               for (let i = 1; i <= cnt; i++) newEps.push(season.season_number + '-' + i);
@@ -348,7 +348,8 @@
     wrap.append(watchedBtn);
     wrap.append(createStatusSelect(ctx));
 
-    const notesIcon = el('button', 'btn-notes-icon', '📝');
+    const notesIcon = el('button', 'btn-notes-icon');
+    notesIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M8 10h6M8 14h4"/></svg>';
     notesIcon.type = 'button';
     notesIcon.title = 'Нотатки';
     notesIcon.setAttribute('aria-label', 'Нотатки');

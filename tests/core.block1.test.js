@@ -79,9 +79,9 @@ describe('Block 1 fixes & invariants', () => {
 
   it('scoreCandidate у streams.js надає пріоритет точному збігу назви, року й типу', () => {
     const { scoreCandidate } = window._streamsUtil;
-    const oldRemake = { title: 'Дюна', year: '1984', isTvHint: false, provider: 'eneyida' };
-    const rightMovie = { title: 'Dune', year: '2021', isTvHint: false, provider: 'eneyida' };
-    const wrongType = { title: 'Дюна', year: '2021', isTvHint: true, provider: 'uaserials' };
+    const oldRemake = { title: 'Дюна', year: '1984', isTvHint: false, provider: 'ashdi' };
+    const rightMovie = { title: 'Dune', year: '2021', isTvHint: false, provider: 'ashdi' };
+    const wrongType = { title: 'Дюна', year: '2021', isTvHint: true, provider: 'embf' };
 
     const sOld = scoreCandidate(oldRemake, 'Дюна', 'Dune', '2021', 'movie');
     const sRight = scoreCandidate(rightMovie, 'Дюна', 'Dune', '2021', 'movie');

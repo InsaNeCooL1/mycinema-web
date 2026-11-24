@@ -2163,6 +2163,7 @@ function renderSettingsPage() {
   if (typeof injectSnowToggle === 'function') injectSnowToggle();
   if (typeof injectExtraSettings === 'function') injectExtraSettings();
   if (typeof injectDismissedReset === 'function') injectDismissedReset();
+  if (typeof injectFilmixSettings === 'function') injectFilmixSettings();
   if (typeof refreshSettingsControls === 'function') refreshSettingsControls();
 
   Object.keys(groups).forEach(key => {

@@ -1,4 +1,4 @@
-/* Eneyida + UASerials PRO + EmbF providers — Integrated Diary Player */
+/* Ashdi + EmbF providers — Integrated Diary Player */
 (function () {
   'use strict';
 
@@ -157,8 +157,6 @@
       else score -= 18;
     }
 
-    if (cand.provider === 'uaserials' && type === 'tv') score += 4;
-    if (cand.provider === 'eneyida' && type === 'movie') score += 3;
     return score;
   }
 
@@ -202,15 +200,16 @@
     });
   }
 
-  /* Універсальний контракт для плеєра: будь-який джерело (Енеїда, UASerials,
+  /* Універсальний контракт для плеєра: будь-яке джерело (Ashdi, EmbF,
      нове — потім) просто віддає flat-список, а оверлей сам будує селектори. */
   function buildVariants(rawItems) {
     return Promise.all((rawItems || []).map(function (x) {
+      if (x.mcSkipQuality) return Promise.resolve([]);
       return fetchQualities(x.url).catch(function () { return []; });
     })).then(function (allQ) {
       var out = [];
       (rawItems || []).forEach(function (x, i) {
-        var qs = allQ[i] && allQ[i].length ? allQ[i] : [{ label: '', url: x.url }];
+        var qs = allQ[i] && allQ[i].length ? allQ[i] : [{ label: x.quality || '', url: x.url }];
         qs.forEach(function (q) {
           out.push({
             season: x.season || '',
@@ -219,7 +218,8 @@
             quality: q.label || 'Найкраща',
             url: q.url || x.url,
             subtitle: x.subtitle || '',
-            audioLang: x.audioLang || ''
+            audioLang: x.audioLang || '',
+            proxy: !!(x.mcProxy || x.proxy)
           });
         });
       });
@@ -227,122 +227,557 @@
     });
   }
 
-  // ─── Search providers ───
-  function searchEneyida(query) {
-    return px('https://eneyida.tv/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'do=search&subaction=search&story=' + encodeURIComponent(query)
-    }).then(function (html) {
-      var results = [], seen = {};
-      [
-        /<a[^>]+class="short_title"[^>]+href="([^"]+)"[^>]*>([^<]*)</gi,
-        /<a[^>]+href="([^"]+)"[^>]+class="short_title"[^>]*>([^<]*)</gi
-      ].forEach(function (re) {
-        var m;
-        while ((m = re.exec(html)) !== null) {
-          var href = m[1];
-          if (href.indexOf('http') !== 0) href = 'https://eneyida.tv' + (href.charAt(0) === '/' ? '' : '/') + href;
-          if (seen[href]) continue;
-          seen[href] = 1;
-          var win = html.slice(Math.max(0, m.index - 350), Math.min(html.length, m.index + 650));
-          var meta = extractSnippetMeta(win + ' ' + href);
-          results.push({
-            href: href,
-            title: m[2].trim(),
-            year: meta.year,
-            isTvHint: meta.isTvHint,
-            provider: 'eneyida'
-          });
-        }
+  /* ─── Ashdi ──────────────────────────────────────────────────────────────
+     Адаптовано з модуля makhno_snack: тайтл шукається за IMDb/TMDB id на
+     WH-сервісі, потім парситься сторінка плеєра ashdi (file:'[...]').
+     Запити йдуть через Jina (WH) і проксі сайту (плеєр) — без CORS у браузері.
+     ─────────────────────────────────────────────────────────────────────── */
+  var WH_HOST = 'https://wh.lme.isroot.in/';
+  var ASHDI_RE = /^https:\/\/(?:ashdi\.vip|sniplyo\.online|creavio\.online)\/(vod|serial)\/\d+(?:[?#]|$)/i;
+  var Q4K_RE = /(^|[^0-9])2160p?([^0-9]|$)|(^|[^a-z0-9])(4k|uhd)([^a-z0-9]|$)/i;
+  var whCache = {};
+
+  function isAshdiPlayer(u) { return ASHDI_RE.test(String(u || '')); }
+  function ashdiOrigin(u) {
+    var m = /^https?:\/\/[^\/?#]+/i.exec(String(u || ''));
+    return m ? m[0] : 'https://ashdi.vip';
+  }
+  function ashdiFix(u) { return String(u || '').trim().replace(/0yql3tj/g, 'oyql3tj'); }
+  function decodeEntities(s) {
+    return String(s || '')
+      .replace(/&#0*39;/g, "'").replace(/&#x27;/gi, "'").replace(/&quot;/g, '"')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+  }
+  function ashdiVoice(t) {
+    t = String(t || '').trim();
+    return /^(не\s*визначено|невідомо|unknown)$/i.test(t) ? '' : t;
+  }
+  // ashdi пише субтитри як "[Українські]https://...vtt" — плеєру потрібен чистий URL
+  function ashdiSub(s) {
+    var text = decodeEntities(String(s || ''));
+    var m = /\[[^\]]*\]\s*(https?:\/\/[^\s,]+|\/[^\s,]+)/.exec(text)
+      || /(https?:\/\/[^\s,]+|\/[^\s,]+)/.exec(text);
+    return m ? m[1] : '';
+  }
+  function collectAshdiFiles(n, out) {
+    if (!n || typeof n !== 'object') return;
+    if (n.file) out.push(String(n.file));
+    (n.folder || []).forEach(function (x) { collectAshdiFiles(x, out); });
+  }
+  function tag4k(name, files) {
+    if (/^\[4K\]/i.test(name) || !files.some(function (f) { return Q4K_RE.test(f); })) return name;
+    return '[4K]' + (name ? ' ' + name : '');
+  }
+  function slimAshdi(n) {
+    if (!n || typeof n !== 'object') return null;
+    var o = { title: ashdiVoice(decodeEntities(String(n.title || '')).replace(/\s+/g, ' ').trim()) };
+    if (n.file) o.file = ashdiFix(n.file);
+    if (n.subtitle) o.subtitle = ashdiSub(n.subtitle);
+    if (Array.isArray(n.folder)) {
+      o.folder = n.folder.map(slimAshdi).filter(function (x) { return x; });
+      if (!o.folder.length) delete o.folder;
+    }
+    return o;
+  }
+  function parseAshdiHtml(html) {
+    var a = /file\s*:\s*'(\[[\s\S]+?\])'\s*[,}]/.exec(html)
+      || /file\s*:\s*"(\[[\s\S]+?\])"\s*[,}]/.exec(html);
+    var tree = null;
+    if (a) {
+      try { tree = JSON.parse(a[1].replace(/\\'/g, "'")); } catch (e) {}
+    }
+    if (!tree) {
+      var m = /file\s*:\s*["'](https?:\/\/[^"'\s]+)["']/.exec(html);
+      if (!m) return null;
+      var sm = /subtitle\s*:\s*["']([^"']*)["']/.exec(html);
+      tree = [{ title: '', file: m[1], subtitle: sm ? sm[1] : '' }];
+    }
+    if (!Array.isArray(tree)) tree = [tree];
+    var out = tree.map(slimAshdi).filter(function (x) { return x; });
+    return out.length ? out : null;
+  }
+  function tagAshdiTree(tree) {
+    var hasVoices = tree[0] && tree[0].folder && tree[0].folder[0] && tree[0].folder[0].folder;
+    tree.forEach(function (v) {
+      var files = [];
+      if (hasVoices) collectAshdiFiles(v, files);
+      else if (v.file) files.push(v.file);
+      if (files.length) v.title = tag4k(v.title, files);
+    });
+    return tree;
+  }
+  function lookupAshdi(imdbId, tmdbId, type) {
+    var imdb = /^tt\d{5,10}$/.test(String(imdbId || '').trim()) ? String(imdbId).trim() : '';
+    var tmdb = /^\d+$/.test(String(tmdbId || '').trim()) ? String(tmdbId).trim() : '';
+    if (!imdb && !tmdb) return Promise.resolve('');
+    var serial = type === 'tv' ? '1' : (type === 'movie' ? '0' : '');
+    var ck = 'wh:' + imdb + ':' + tmdb + ':' + serial;
+    var hit = whCache[ck];
+    if (hit && Date.now() < hit.until) return Promise.resolve(hit.play || '');
+    var p = [];
+    if (imdb) p.push('imdb_id=' + encodeURIComponent(imdb));
+    if (tmdb) p.push('tmdb_id=' + encodeURIComponent(tmdb));
+    if (serial) p.push('serial=' + serial);
+    p.push('silent=true');
+    // WH-сервіс не віддає CORS і не в списку дозволених хостів нашого проксі,
+    // тому йдемо через Jina (як EmbF) і дістаємо JSON з <pre>.
+    return jinaPx(WH_HOST + '?' + p.join('&')).then(function (text) {
+      var raw = String(text || '').trim();
+      var pre = /<pre[^>]*>([\s\S]*?)<\/pre>/i.exec(raw);
+      if (pre) raw = pre[1].replace(/&quot;/g, '"').replace(/&#0*39;|&#x27;/gi, "'")
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      var j = null;
+      try { j = JSON.parse(raw.trim()); } catch (e) {}
+      var play = j && typeof j.play === 'string' ? j.play.trim() : '';
+      if (!isAshdiPlayer(play)) play = '';
+      whCache[ck] = { play: play, until: Date.now() + (play ? 86400000 : 3600000) };
+      return play;
+    }).catch(function () { return ''; });
+  }
+  function resolveAshdi(cand) {
+    if (detailCache[cand.href]) return Promise.resolve(detailCache[cand.href]);
+    var href = cand.href;
+    var ask = (/\/vod\//i.test(href) && !/multivoice/i.test(href))
+      ? href + (href.indexOf('?') >= 0 ? '&' : '?') + 'multivoice' : href;
+    return px(ask, { referer: ashdiOrigin(href) + '/' }).then(function (html) {
+      var tree = parseAshdiHtml(html);
+      if (!tree) throw new Error('Ashdi: плеєр не віддав джерела');
+      tagAshdiTree(tree);
+      var flat = flatten(tree);
+      if (!flat.length) throw new Error('Немає доступних джерел');
+      var origin = ashdiOrigin(href);
+      flat.forEach(function (x) {
+        if (x.subtitle && /^\//.test(x.subtitle)) x.subtitle = origin + x.subtitle;
+        // сегменти лежать на jk*ocmjeoyql3tj.ashdi.vip з ACAO: https://ashdi.vip —
+        // їх треба тягнути через наш CF-прокси, інакше браузер блокує CORS
+        x.mcProxy = true;
       });
-      return results;
+      detailCache[href] = flat;
+      return flat;
     });
   }
 
-  function searchUASerials(query) {
-    return px('https://uaserials.my/index.php?do=search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'do=search&subaction=search&story=' + encodeURIComponent(query) + '&search_start=0&full_search=0&result_from=1'
-    }).then(function (html) {
-      var results = [], seen = {};
-      var blocks = html.split('class="short-item');
-      for (var i = 1; i < blocks.length; i++) {
-        var block = blocks[i];
-        var hrefMatch = block.match(/href="((?:https?:\/\/uaserials\.my)?\/\d+-[^"]+\.html)"/);
-        if (!hrefMatch) continue;
-        var href = hrefMatch[1];
-        if (href.indexOf('http') !== 0) href = 'https://uaserials.my' + href;
-        if (seen[href]) continue;
-        seen[href] = 1;
-        var titleMatch = block.match(/class="th-title truncate"[^>]*>([^<]*)</);
-        var title = titleMatch ? titleMatch[1].trim() : '';
-        if (!title || title.length < 2) {
-          var altMatch = block.match(/alt="([^"]+)"/);
-          title = altMatch ? altMatch[1].trim() : 'UASerials';
+  /* ─── Filmix (mobile API v2) ────────────────────────────────────────────
+     Усі запити через CF-воркер: він ставить okhttp/3.10.0 і прибирає
+     браузерні Origin/Referer для filmixapp.cyou. */
+  var FM_HTTP = 'http://filmixapp.cyou/api/v2';
+  var FM_HTTPS = 'https://filmixapp.cyou/api/v2';
+  var FM_K = { dev: 'mycinema.filmix.devId', token: 'mycinema.filmix.token',
+    pending: 'mycinema.filmix.pending', pendingCode: 'mycinema.filmix.pendingUserCode',
+    map: 'mycinema.filmix.map' };
+  function fmGet(k, d) { try { var v = localStorage.getItem(k); return v === null || v === undefined ? d : v; } catch (e) { return d; } }
+  function fmSet(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+  function fmDevId() {
+    var id = fmGet(FM_K.dev, '');
+    if (!/^[0-9a-f]{16}$/i.test(id)) {
+      id = '';
+      for (var i = 0; i < 16; i++) id += Math.floor(Math.random() * 16).toString(16);
+      fmSet(FM_K.dev, id);
+    }
+    return id;
+  }
+  function fmToken() { return fmGet(FM_K.token, ''); }
+  function fmSetToken(t) { fmSet(FM_K.token, t || ''); }
+  function fmParams() {
+    return 'user_dev_id=' + encodeURIComponent(fmDevId()) +
+      '&user_dev_name=Xiaomi&user_dev_vendor=Xiaomi&user_dev_os=14' +
+      '&user_dev_apk=2.2.0&app_lang=ru-rRU' +
+      '&user_dev_token=' + encodeURIComponent(fmToken());
+  }
+  function fmApi(path, opts, tokenOverride) {
+    var sep = path.indexOf('?') >= 0 ? '&' : '?';
+    var tail = sep + fmParams().replace(/user_dev_token=[^&]*/,
+      'user_dev_token=' + encodeURIComponent(tokenOverride === undefined ? fmToken() : tokenOverride));
+    return px(FM_HTTP + '/' + path + tail, opts)
+      .catch(function () { return px(FM_HTTPS + '/' + path + tail, opts); })
+      .then(function (text) {
+        var j = null;
+        try { j = JSON.parse(text); } catch (e) { throw new Error('Filmix: невалідна відповідь'); }
+        if (j && (j.error || j.status === 'error')) {
+          throw new Error(j.error_message || j.error || 'Filmix API error');
         }
-        var meta = extractSnippetMeta(block);
-        results.push({
-          href: href,
-          title: title,
-          year: meta.year,
-          isTvHint: meta.isTvHint !== null ? meta.isTvHint : true,
-          provider: 'uaserials'
+        return j;
+      });
+  }
+  function filmixTokenRequest() {
+    return fmApi('token_request').then(function (j) {
+      /* Lampa: саме поле code є тимчасовим токеном пристрою.
+         Повторний token_request створює НОВИЙ код — його не можна використовувати
+         для опитування активації. */
+      var tok = String((j && j.code) || (j && j.user_dev_token) || '');
+      return {
+        user_code: String((j && j.user_code) || ''),
+        code: tok, user_dev_token: tok, tempToken: tok
+      };
+    });
+  }
+  function filmixDeviceStart() {
+    return filmixTokenRequest().then(function (p) {
+      if (p.code) fmSet(FM_K.pending, p.code);
+      if (p.user_code) fmSet(FM_K.pendingCode, p.user_code);
+      return { user_code: p.user_code, code: p.code };
+    });
+  }
+  function filmixDeviceCheck() {
+    var pending = fmGet(FM_K.pending, '');
+    var userCode = fmGet(FM_K.pendingCode, '');
+    if (!pending) return Promise.resolve({ activated: false, user_code: userCode });
+    /* Після вводу user_code на сайті постійний токен = той самий code.
+       Перевіряємо через user_profile — успішна відповідь означає активацію. */
+    return fmApi('user_profile', null, pending).then(function (j) {
+      if (j && j.user_data) {
+        fmSetToken(pending);
+        fmSet(FM_K.pending, '');
+        fmSet(FM_K.pendingCode, '');
+        fmProfileCache = {
+          v: j.user_data.is_pro_plus === true ? 2160 : (j.user_data.is_pro === true ? 1080 : 720),
+          ts: Date.now()
+        };
+        return { activated: true, token: pending };
+      }
+      return { activated: false, user_code: userCode };
+    }).catch(function () { return { activated: false, user_code: userCode }; });
+  }
+  var fmStore = {};
+  function fmCached(key, ttl, fn) {
+    var hit = fmStore[key];
+    if (hit && Date.now() < hit.until) return Promise.resolve(hit.v);
+    return Promise.resolve().then(fn).then(function (v) {
+      fmStore[key] = { v: v, until: Date.now() + ttl };
+      return v;
+    });
+  }
+  var fmProfileCache = { v: null, ts: 0 };
+  function filmixMaxQuality() {
+    if (!fmToken()) return Promise.resolve(480);
+    if (fmProfileCache.v !== null && Date.now() - fmProfileCache.ts < 1800000) {
+      return Promise.resolve(fmProfileCache.v);
+    }
+    return fmApi('user_profile').then(function (j) {
+      var u = (j && j.user_data) || j || {};
+      var q = u.is_pro_plus === true ? 2160 : (u.is_pro === true ? 1080 : 720);
+      fmProfileCache = { v: q, ts: Date.now() };
+      return q;
+    }).catch(function () { return 720; });
+  }
+  function fmMap() {
+    try {
+      var o = JSON.parse(localStorage.getItem(FM_K.map) || '{}');
+      return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+    } catch (e) { return {}; }
+  }
+  function fmMapGet(type, id) {
+    var e = fmMap()['tmdb:' + type + ':' + id];
+    return (e && e.filmixId && Date.now() - (e.updatedAt || 0) < 2592000000) ? e : null;
+  }
+  function fmMapSet(type, id, filmixId, title, year) {
+    var all = fmMap();
+    all['tmdb:' + type + ':' + id] = {
+      filmixId: filmixId, title: title || '', year: year || '', updatedAt: Date.now()
+    };
+    try { localStorage.setItem(FM_K.map, JSON.stringify(all)); } catch (e) {}
+  }
+  function fmNormalize(p) {
+    if (!p || !p.id) return null;
+    var section = Number(p.section || 0);
+    return {
+      id: String(p.id),
+      title: String(p.title || ''),
+      orig: String(p.original_title || p.orig_title || ''),
+      year: String(p.year || ''),
+      isTvHint: section === 7,
+      section: section,
+      alt: String(p.alt_name || ''),
+      href: 'https://filmix.my/' + (section === 7 ? 'seria' : 'film') + '/' + p.id + '.html',
+      provider: 'filmix'
+    };
+  }
+  function filmixList(j) {
+    var raw = (j && j.posts) || (Array.isArray(j) ? j : []) || [];
+    return raw.map(fmNormalize).filter(Boolean);
+  }
+  function filmixSearch(query) {
+    var q = String(query || '').replace(/[«»"“”]/g, '').trim();
+    if (!q) return Promise.resolve([]);
+    /* suggestions для гостя часто повертає [] — тоді реально працює /search?story=
+       (саме його використовує go-filmix). Фолбек має спрацьовувати і на порожній список. */
+    var fallback = function () {
+      return fmApi('search?story=' + encodeURIComponent(q))
+        .then(filmixList).catch(function () { return []; });
+    };
+    return fmApi('suggestions?search_word=' + encodeURIComponent(q))
+      .then(function (j) {
+        var list = filmixList(j);
+        return list.length ? list : fallback();
+      })
+      .catch(fallback);
+  }
+  function filmixScore(cand, names, year, type) {
+    var list = [cand.title, cand.orig].filter(Boolean).map(normStr);
+    var best = 0;
+    (names || []).forEach(function (n) {
+      var t = normStr(n);
+      if (!t) return;
+      list.forEach(function (c) {
+        var v = 0;
+        if (c === t) v = 100;
+        else if (c.indexOf(t) === 0 || t.indexOf(c) === 0) v = 80;
+        else if (c.indexOf(t) >= 0 || t.indexOf(c) >= 0) v = 60;
+        else {
+          var cw = c.split(' ').filter(function (w) { return w.length > 2; });
+          var tw = t.split(' ').filter(function (w) { return w.length > 2; });
+          if (cw.length && tw.length) {
+            var hits = cw.filter(function (w) { return tw.indexOf(w) >= 0; }).length;
+            v = Math.round((hits / Math.max(cw.length, tw.length)) * 50);
+          }
+        }
+        if (v > best) best = v;
+      });
+    });
+    if (!best) return 0;
+    if (cand.year && year && Math.abs(parseInt(cand.year, 10) - parseInt(year, 10)) > 1) best -= 40;
+    if (type && cand.isTvHint !== (type === 'tv')) best -= 30;
+    return Math.max(0, best);
+  }
+  function searchFilmixSmart(title, origTitle, ruTitle, year, type, tmdbId) {
+    var names = [], seenName = {};
+    [origTitle, ruTitle, title].forEach(function (n) {
+      var s = String(n || '').replace(/[«»"“”]/g, '').trim();
+      if (s && !seenName[normStr(s)]) { seenName[normStr(s)] = 1; names.push(s); }
+    });
+    return Promise.all(names.map(function (q) {
+      return filmixSearch(q).catch(function () { return []; });
+    })).then(function (groups) {
+      var seen = {}, out = [];
+      groups.forEach(function (g) {
+        g.forEach(function (c) {
+          var score = filmixScore(c, names, year, type);
+          if (score < 60) return; /* жорсткий фільтр */
+          if (seen[c.id]) {
+            var prev = out.filter(function (x) { return x.id === c.id; })[0];
+            if (prev && score > prev.score) prev.score = score;
+            return;
+          }
+          seen[c.id] = 1;
+          c.score = score;
+          out.push(c);
+        });
+      });
+      out.sort(function (a, b) { return b.score - a.score; });
+      /* Прив'язка, обрана користувачем раніше, має пріоритет */
+      var mapped = tmdbId ? fmMapGet(type || 'movie', tmdbId) : null;
+      if (mapped) {
+        var chosen = out.filter(function (x) { return x.id === String(mapped.filmixId); })[0];
+        if (chosen) {
+          out = [chosen].concat(out.filter(function (x) { return x !== chosen; }));
+        } else {
+          out.unshift({ id: String(mapped.filmixId), title: mapped.title || title,
+            orig: origTitle || '', year: mapped.year || '', href: 'https://filmix.my/film/' + mapped.filmixId + '.html',
+            isTvHint: type === 'tv', score: 100, provider: 'filmix' });
+        }
+      }
+      if (out.length) {
+        out[0].matches = out.slice(1, 10).map(function (x) {
+          return { id: x.id, title: x.title, year: x.year, url: x.href };
         });
       }
-      return results;
+      return out;
     });
   }
-
-  function searchDleSite(baseUrl, providerId, defaultTv, query) {
-    return px(baseUrl + '/index.php?do=search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'do=search&subaction=search&story=' + encodeURIComponent(query) + '&search_start=0&full_search=0&result_from=1'
-    }).then(function (html) {
-      var results = [], seen = {};
-      var hostEsc = baseUrl.replace(/^https?:\/\//, '').replace(/\./g, '\\.');
-      var re = new RegExp('<a[^>]+href="((?:https?:\\/\\/' + hostEsc + ')?\\/[^"#]*\\d+-[^"]+\\.html)"[^>]*>([\\s\\S]{1,160}?)<\\/a>', 'gi');
-      var m;
-      while ((m = re.exec(html)) !== null) {
-        var href = m[1];
-        if (href.indexOf('http') !== 0) href = baseUrl + (href.charAt(0) === '/' ? '' : '/') + href;
-        if (seen[href] || /\/(user|xfsearch|page)\//i.test(href)) continue;
-        var innerTxt = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-        var win = html.slice(Math.max(0, m.index - 250), Math.min(html.length, m.index + 650));
-        if (!innerTxt || innerTxt.length < 2) {
-          var altM = win.match(/alt="([^"]{2,120})"/i) || win.match(/title="([^"]{2,120})"/i);
-          innerTxt = altM ? altM[1].trim() : '';
-        }
-        if (!innerTxt || innerTxt.length < 2 || /^(детальніше|дивитись|читати)/i.test(innerTxt)) continue;
-        seen[href] = 1;
-        var meta = extractSnippetMeta(win + ' ' + href);
-        results.push({ href: href, title: innerTxt, year: meta.year, isTvHint: meta.isTvHint !== null ? meta.isTvHint : defaultTv, provider: providerId });
-      }
-      return results;
+  function filmixQualities(link) {
+    var m = /_\[([\d,]+)\]\.mp4/i.exec(String(link || ''));
+    if (m) {
+      return m[1].split(',').map(function (x) { return parseInt(x, 10); })
+        .filter(function (n) { return n > 0; });
+    }
+    return /_%s\.mp4/i.test(String(link || '')) ? [1080, 720, 480] : [];
+  }
+  function filmixApplyQuality(link, q) {
+    return String(link || '')
+      .replace(/_\[[\d,]+\]\.mp4/i, '_' + q + '.mp4')
+      .replace(/_%s\.mp4/i, '_' + q + '.mp4')
+      .replace(/sundb\.coldcdn\.xyz/ig, 'sundb.nl');
+  }
+  function fmIsUa(name) { return /укр|укра|ukr|\bua\b|IdeaFilm|Truefans|Новафільм|Невафільм/i.test(String(name || '')); }
+  function filmixMakeVariant(link, translation, season, episode, cap, isUa) {
+    var qs = filmixQualities(link).filter(function (q) { return q <= cap; });
+    if (!qs.length) qs = [480]; /* без токена — 480p */
+    qs.sort(function (a, b) { return b - a; });
+    return qs.slice(0, 4).map(function (q) {
+      var clean = filmixApplyQuality(link, q);
+      var direct = clean.replace(/:hls:manifest\.m3u8.*$/i, '');
+      return {
+        translation: translation, season: season ? 'Сезон ' + season : '',
+        episode: episode ? 'Серія ' + episode : '',
+        quality: q + 'p', url: direct, audioLang: isUa ? 'uk' : '',
+        mcSkipQuality: true
+      };
     });
   }
-
-  /* EmbF — пошук тайтлу на сайті, потім резолв embed'а в пряме медіа. */
-  function searchEmbf(query) {
-    return jinaPx(EMBF_SITE + '/index.php?do=search&subaction=search&story=' + encodeURIComponent(query))
-      .then(function (html) {
-        var results = [], seen = {};
-        var re = /<a[^>]+href="(https?:\/\/uakinogo\.is\/\d+-[^"]+\.html)"[^>]*>([\s\S]{1,200}?)<\/a>/gi;
-        var m;
-        while ((m = re.exec(html)) !== null) {
-          var href = m[1];
-          var title = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-          if (!title || title.length < 2 || seen[href]) continue;
-          seen[href] = 1;
-          var win = html.slice(Math.max(0, m.index - 250), Math.min(html.length, m.index + 500));
-          var meta = extractSnippetMeta(win + ' ' + href);
-          results.push({ href: href, title: title, year: meta.year,
-            isTvHint: meta.isTvHint !== null ? meta.isTvHint : null, provider: 'embf' });
-        }
-        return results;
+  function resolveFilmix(cand, type, tmdbId) {
+    var cap = 720;
+    return filmixMaxQuality().then(function (q) {
+      cap = q;
+      return fmCached('fm:post:' + cand.id, 5400000, function () {
+        return fmApi('post/' + encodeURIComponent(cand.id));
       });
+    }).then(function (post) {
+      if (!post || !post.player_links) throw new Error('Filmix: дані поста відсутні');
+      var links = post.player_links;
+      var out = [];
+      var trs = [];
+      if (Array.isArray(links.movie)) {
+        links.movie.forEach(function (t) { if (t && t.link) trs.push({ name: t.translation || 'Озвучка', link: t.link }); });
+      }
+      if (links.playlist && typeof links.playlist === 'object') {
+        Object.keys(links.playlist).forEach(function (sNum) {
+          var season = links.playlist[sNum];
+          if (!season || typeof season !== 'object') return;
+          Object.keys(season).forEach(function (name) {
+            var eps = season[name];
+            if (!eps) return;
+            var arr = Array.isArray(eps) ? eps : Object.keys(eps).map(function (k) {
+              return Object.assign({ _n: parseInt(k, 10) }, eps[k]);
+            });
+            arr.forEach(function (e, i) {
+              if (e && e.link) trs.push({
+                name: name, link: e.link, season: parseInt(sNum, 10) || 0,
+                episode: (e._n || i + 1)
+              });
+            });
+          });
+        });
+      }
+      if (!trs.length) throw new Error('Filmix: немає доступних озвучок');
+      trs.sort(function (a, b) { return (fmIsUa(b.name) ? 1 : 0) - (fmIsUa(a.name) ? 1 : 0); });
+      var seen = {};
+      trs.forEach(function (t) {
+        var key = t.name + '|' + (t.season || 0) + '|' + (t.episode || 0);
+        if (seen[key]) return;
+        seen[key] = 1;
+        out = out.concat(filmixMakeVariant(t.link, t.name, t.season, t.episode, cap, fmIsUa(t.name)));
+      });
+      if (!out.length) throw new Error('Filmix: немає потоків для цього токена');
+      if (tmdbId) fmMapSet(type || 'movie', tmdbId, cand.id, cand.title, cand.year);
+      return out;
+    });
+  }
+
+  // ─── Search providers ───
+
+  /* EmbF — GET-пошук (?story=) НЕ фільтрує каталог і завжди віддає останні
+     10 релізів. Реальний пошук — AJAX POST з query + user_hash. */
+  var embfHash = { value: '', ts: 0 };
+  function embfUserHash() {
+    if (embfHash.value && Date.now() - embfHash.ts < 600000) return Promise.resolve(embfHash.value);
+    /* Важливо: hash треба брати тим самим проксі, що й AJAX-запит.
+       Jina віддає hash від іншої сесії → DLE каже «сессия истекла». */
+    return px(EMBF_SITE + '/').then(function (html) {
+      var m = /dle_login_hash\s*=\s*['"]([a-f0-9]+)['"]/i.exec(html);
+      embfHash.value = m ? m[1] : '';
+      embfHash.ts = Date.now();
+      return embfHash.value;
+    }).catch(function () { return ''; });
+  }
+  function parseEmbfAjax(html) {
+    var results = [], seen = {};
+    var re = /<a[^>]+href="(https?:\/\/(?:uakinogo|kinogo)\.is\/\d+-[^"]+\.html)"[^>]*>\s*<span class="searchheading">([\s\S]{1,200}?)<\/span>/gi;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+      var href = m[1].replace(/^https?:\/\/kinogo\.is/i, EMBF_SITE);
+      var title = decodeEntities(m[2].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+      var ym = /\((\d{4})\)/.exec(title); /* рік — з назви, не з дати оновлення */
+      var clean = title.replace(/\s*\(\d{4}\)\s*$/, '').trim();
+      if (!clean || seen[href]) continue;
+      seen[href] = 1;
+      results.push({ href: href, title: clean, year: ym ? ym[1] : '',
+        isTvHint: null, provider: 'embf' });
+    }
+    return results;
+  }
+  function embfAjaxSearch(query) {
+    var q = String(query || '').replace(/[«»"“”]/g, '').trim();
+    if (!q) return Promise.resolve([]);
+    function post(hash) {
+      return px(EMBF_SITE + '/engine/ajax/controller.php?mod=search', {
+        method: 'POST',
+        referer: EMBF_SITE + '/',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'query=' + encodeURIComponent(q) + '&user_hash=' + encodeURIComponent(hash)
+      });
+    }
+    return embfUserHash().then(function (hash) {
+      if (!hash) return [];
+      return post(hash).then(function (html) {
+        if (/сессия истекла|перезагрузите страницу/i.test(html)) {
+          /* Сесія на сайті оновилась — беремо свіжий hash і повторюємо запит */
+          embfHash.value = '';
+          return embfUserHash().then(function (h2) {
+            return h2 ? post(h2).then(parseEmbfAjax) : [];
+          });
+        }
+        return parseEmbfAjax(html);
+      }).catch(function () { return []; });
+    });
+  }
+  function searchEmbf(query) { return embfAjaxSearch(query); }
+
+  /* Жорсткий фільтр: кандидат має збігатися з однією з відомих назв.
+     Інакше повертаємо 0, а не випадковий топ-10 каталогу. */
+  function embfMatchScore(cand, names, year) {
+    var c = normStr(String(cand.title || '').replace(/\s*\(\d{4}\)\s*$/, ''));
+    if (!c) return 0;
+    var best = 0;
+    (names || []).forEach(function (n) {
+      var t = normStr(n);
+      if (!t) return;
+      var v = 0;
+      if (c === t) v = 100;
+      else if (c.indexOf(t) === 0 || t.indexOf(c) === 0) v = 80;
+      else if (c.indexOf(t) >= 0 || t.indexOf(c) >= 0) v = 60;
+      else {
+        var cw = c.split(' ').filter(function (w) { return w.length > 2; });
+        var tw = t.split(' ').filter(function (w) { return w.length > 2; });
+        if (!cw.length || !tw.length) return;
+        var hits = cw.filter(function (w) { return tw.indexOf(w) >= 0; }).length;
+        v = Math.round((hits / Math.max(cw.length, tw.length)) * 50);
+      }
+      if (v > best) best = v;
+    });
+    if (best && cand.year && year && String(cand.year) !== String(year).slice(0, 4)) {
+      best = Math.max(0, best - 40);
+    }
+    return best;
+  }
+  function searchEmbfSmart(title, origTitle, ruTitle, year) {
+    var names = [], seenName = {};
+    [origTitle, ruTitle, title].forEach(function (n) {
+      var s = String(n || '').replace(/[«»"“”]/g, '').trim();
+      if (s && !seenName[normStr(s)]) { seenName[normStr(s)] = 1; names.push(s); }
+    });
+    if (!names.length) return Promise.resolve([]);
+    return Promise.all(names.map(function (q) {
+      return embfAjaxSearch(q).catch(function () { return []; });
+    })).then(function (groups) {
+      var seen = {}, out = [];
+      groups.forEach(function (g) {
+        g.forEach(function (c) {
+          if (seen[c.href]) return;
+          var score = embfMatchScore(c, names, year);
+          if (score < 60) return; /* відсікаємо чужий топ-10 */
+          seen[c.href] = 1;
+          c.score = score;
+          out.push(c);
+        });
+      });
+      return out.sort(function (a, b) { return b.score - a.score; });
+    });
+  }
+  function getEmbfRuTitle(tmdbId, type) {
+    if (!tmdbId || typeof tmdbFetch !== 'function') return Promise.resolve('');
+    return Promise.resolve(tmdbFetch('/' + (type === 'tv' ? 'tv' : 'movie') + '/' + tmdbId + '?language=ru-RU'))
+      .then(function (d) { return (d && (d.title || d.name)) || ''; })
+      .catch(function () { return ''; });
   }
 
   function resolveEmbf(cand) {
@@ -360,16 +795,6 @@
       }];
     });
   }
-  function searchUASerialsMirror(query) {
-    // UASerials PRO — основне джерело; .my лишається лише як фолбек.
-    return searchDleSite('https://uaserials.pro', 'uaserials', true, query)
-      .catch(function () { return []; })
-      .then(function (r) {
-        if (r && r.length) return r;
-        return searchUASerials(query).catch(function () { return []; });
-      });
-  }
-
   function searchProviderSmart(searchFn, title, origTitle, year, type) {
     var q1 = String(title || '').replace(/[«»"“”]/g, '').trim();
     var q2 = String(origTitle || '').replace(/[«»"“”]/g, '').trim();
@@ -399,47 +824,6 @@
   }
 
   // ─── Resolvers ───
-  function resolveDetail(url) {
-    return px(url).then(function (html) {
-      var m = html.match(/class="[^"]*tabs_b[^"]*visible[^"]*"[^>]*>[\s\S]{0,3000}?<iframe[^>]+(?:data-)?src="([^"]+)"/)
-        || html.match(/<iframe[^>]+(?:data-)?src="(https?:\/\/[^"]*hdvbua[^"]+)"/)
-        || html.match(/<iframe[^>]+(?:data-)?src="(https?:\/\/[^"]+)"/);
-      if (!m) throw new Error('Player iframe не знайдено');
-      var u = m[1];
-      if (u.indexOf('//') === 0) u = 'https:' + u;
-      return u;
-    });
-  }
-  function fetchEmbedJson(embedUrl) {
-    return px(embedUrl, { referer: 'https://eneyida.tv/' }).then(function (html) {
-      var m = html.match(/file\s*:\s*'([^']+)'/) || html.match(/file\s*:\s*"([^"]+)"/);
-      if (!m) throw new Error('Поле "file" відсутнє');
-      var raw = m[1];
-      if (raw.indexOf('http') === 0) return [{ title: 'HD', file: raw }];
-      try { return JSON.parse(raw); }
-      catch (e) { throw new Error('JSON parse: ' + e.message); }
-    });
-  }
-  function resolveUASerialsDetail(url) {
-    return px(url).then(function (html) {
-      var m = html.match(/<iframe[^>]+(?:data-)?src="([^"]+)"/);
-      if (!m) throw new Error('UASerials: iframe не знайдено');
-      var u = m[1];
-      if (u.indexOf('//') === 0) u = 'https:' + u;
-      return u;
-    });
-  }
-  function fetchUASerialsEmbed(embedUrl, referer) {
-    return px(embedUrl, { referer: referer || 'https://uaserials.pro/' }).then(function (html) {
-      var m = html.match(/file\s*:\s*'([^']+)'/) || html.match(/file\s*:\s*"([^"]+)"/);
-      if (!m) throw new Error('UASerials: поле "file" відсутнє');
-      var raw = m[1];
-      if (raw.indexOf('http') === 0) return [{ title: 'HD', file: raw }];
-      try { return JSON.parse(raw); }
-      catch (e) { throw new Error('UASerials JSON parse: ' + e.message); }
-    });
-  }
-
   function flatten(tree, path) {
     path = path || {};
     var out = [];
@@ -485,24 +869,15 @@
 
   function loadFlatForResult(cand) {
     if (detailCache[cand.href]) return Promise.resolve(detailCache[cand.href]);
+    if (cand.provider === 'ashdi') return resolveAshdi(cand);
+    if (cand.provider === 'filmix') return resolveFilmix(cand, cand.mcType, cand.mcTmdbId);
     if (cand.provider === 'embf') {
       return resolveEmbf(cand).then(function (res) {
         if (res && res.length) detailCache[cand.href] = res;
         return res;
       });
     }
-    var resolveP = cand.provider === 'uaserials'
-      ? resolveUASerialsDetail(cand.href).then(function (embedUrl) {
-          var ref = String(cand.href).replace(/^(https?:\/\/[^/]+).*$/, '$1/');
-          return fetchUASerialsEmbed(embedUrl, ref);
-        })
-      : resolveDetail(cand.href).then(fetchEmbedJson);
-    return resolveP.then(function (tree) {
-      var flat = flatten(tree);
-      if (!flat.length) throw new Error('Немає доступних джерел');
-      detailCache[cand.href] = flat;
-      return flat;
-    });
+    return Promise.reject(new Error('Невідомий провайдер джерел'));
   }
 
   // ─── Fullscreen & Back helpers ───
@@ -638,6 +1013,42 @@
     return hlsLoading;
   }
 
+  function proxyMediaUrl(u) {
+    return getProxy() + '?url=' + encodeURIComponent(String(u || ''));
+  }
+
+  /* hls.js: плейлисти ashdi.vip мають ACAO:*, а сегменти лежать на
+     jk*ocmjeoyql3tj.ashdi.vip з ACAO: https://ashdi.vip. Переписуємо URL
+     фрагментів/ключів на CF-прокси.
+     Важливо: hls.js створює лоадер як new Loader(config), а фрагменти завантажує
+     окремим config.fLoader — тому обгортка має коректний сигнітур і ставитись
+     і в loader, і в fLoader. */
+  function createProxyLoader(Base) {
+    function ProxyLoader(config) {
+      this._base = new Base(config);
+      this.stats = this._base.stats;
+    }
+    ProxyLoader.prototype.load = function (context, loaderConfig, callbacks) {
+      if (context && (context.frag || context.keyInfo)) {
+        var u = String(context.url || '');
+        if (/^https:\/\/[^/]*ashdi\.vip\//i.test(u)) context.url = proxyMediaUrl(u);
+      }
+      return this._base.load(context, loaderConfig, callbacks);
+    };
+    ['abort', 'destroy', 'getCacheAge', 'getResponseHeader'].forEach(function (m) {
+      ProxyLoader.prototype[m] = function () {
+        if (typeof this._base[m] !== 'function') return null;
+        return this._base[m].apply(this._base, arguments);
+      };
+    });
+    Object.defineProperty(ProxyLoader.prototype, 'context', {
+      configurable: true,
+      get: function () { return this._base.context; },
+      set: function (v) { this._base.context = v; }
+    });
+    return ProxyLoader;
+  }
+
   function openVideo(url, subtitle, meta) {
     meta = meta || {};
     closeVideoOverlay();
@@ -759,14 +1170,19 @@
         if (pos > 0) video.addEventListener('loadedmetadata', seek);
         video.play().catch(function () {});
       }
-      if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
+      if (isHls && !meta.forceHls && video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = nextUrl;
         video.addEventListener('loadedmetadata', applyNativeAudio);
         afterSeek();
       } else if (isHls) {
         ensureHls().then(function (Hls) {
           if (Hls && Hls.isSupported()) {
-            var hls = ov._hls || new Hls({ enableWorker: true, lowLatencyMode: false });
+            var hlsOpts = { enableWorker: true, lowLatencyMode: false };
+            if (meta.forceHls) {
+              hlsOpts.loader = createProxyLoader(Hls.DefaultConfig.loader);
+              hlsOpts.fLoader = createProxyLoader(Hls.DefaultConfig.fLoader || Hls.DefaultConfig.loader);
+            }
+            var hls = ov._hls || new Hls(hlsOpts);
             ov._hls = hls;
             hls.loadSource(nextUrl);
             if (!hls.media) hls.attachMedia(video);
@@ -967,6 +1383,7 @@
           variants: variants,
           initial: variants[0],
           audioLang: variants[0].audioLang,
+          forceHls: variants.some(function (v) { return v.proxy; }),
           onClosed: function (watchedSec) {
             if (epMeta && mediaKey && watchedSec >= 25 && !isEpWatchedInLib(mediaKey, sNum, epNum)) {
               ui.pendingMark = epMeta;
@@ -1140,6 +1557,7 @@
 
   function openStreamPicker(title, year, type, imdbId, origTitle, opts) {
     var mediaKey = (opts && opts.key) || '';
+    var tmdbId = (opts && opts.tmdbId) || '';
     var q = String(title || '').trim();
     var headerTitle = q + (year ? ' (' + year + ')' : '');
     var ov = createShell(headerTitle || 'Джерело UA');
@@ -1153,23 +1571,41 @@
     }
     body.innerHTML = '<div class="streams-status">Пошук «' + esc(q || origTitle) + '»…</div>';
 
-    Promise.allSettled([
-      searchProviderSmart(searchEneyida, q, origTitle, year, type),
-      searchProviderSmart(searchUASerialsMirror, q, origTitle, year, type),
-      searchProviderSmart(searchEmbf, q, origTitle, year, type)
-    ]).then(function (results) {
+    var ashdiP = lookupAshdi(imdbId, tmdbId, type).then(function (href) {
+      if (!href) return [];
+      return [{
+        href: href,
+        title: q || origTitle || '',
+        year: year || '',
+        isTvHint: type === 'tv',
+        provider: 'ashdi'
+      }];
+    });
+
+    var localizedP = getEmbfRuTitle(tmdbId, type);
+    var embfP = localizedP.then(function (ruTitle) {
+      return searchEmbfSmart(q, origTitle, ruTitle, year);
+    });
+    var filmixP = localizedP.then(function (ruTitle) {
+      return searchFilmixSmart(q, origTitle, ruTitle, year, type, tmdbId);
+    });
+
+    Promise.allSettled([ashdiP, embfP, filmixP]).then(function (results) {
       if (!body || !body.isConnected) return;
-      var eneyida = results[0].status === 'fulfilled' ? results[0].value : [];
-      var uas = results[1].status === 'fulfilled' ? results[1].value : [];
-      var embf = results[2].status === 'fulfilled' ? results[2].value : [];
+      var ashdi = results[0].status === 'fulfilled' ? results[0].value : [];
+      var embf = results[1].status === 'fulfilled' ? results[1].value : [];
+      var filmix = results[2].status === 'fulfilled' ? results[2].value : [];
 
       var providers = [];
-      if (eneyida.length) providers.push({ id: 'eneyida', label: 'Eneyida', results: eneyida });
-      if (uas.length) providers.push({ id: 'uaserials', label: 'UASerials PRO', results: uas });
+      if (ashdi.length) providers.push({ id: 'ashdi', label: 'Ashdi', results: ashdi });
       if (embf.length) providers.push({ id: 'embf', label: 'EmbF', results: embf });
+      if (filmix.length) {
+        filmix.forEach(function (c) { c.mcType = type; c.mcTmdbId = tmdbId; });
+        providers.push({ id: 'filmix', label: 'Filmix', results: filmix });
+      }
 
       if (!providers.length) {
-        body.innerHTML = '<div class="streams-error">Нічого не знайдено на балансерах</div>';
+        body.innerHTML = '<div class="streams-error">Нічого не знайдено</div>';
         return;
       }
 
@@ -1190,7 +1626,85 @@
   };
   window._streamsUtil = {
     scoreCandidate: scoreCandidate, extractSnippetMeta: extractSnippetMeta, normStr: normStr,
-    searchEmbf: searchEmbf, resolveEmbf: resolveEmbf,
-    searchUASerialsMirror: searchUASerialsMirror
+    searchEmbf: searchEmbf, searchEmbfSmart: searchEmbfSmart,
+    embfMatchScore: embfMatchScore, resolveEmbf: resolveEmbf,
+    isAshdiPlayer: isAshdiPlayer, parseAshdiHtml: parseAshdiHtml, tagAshdiTree: tagAshdiTree,
+    lookupAshdi: lookupAshdi, resolveAshdi: resolveAshdi,
+    proxyMediaUrl: proxyMediaUrl, createProxyLoader: createProxyLoader,
+    filmixApi: fmApi, filmixDevId: fmDevId, filmixTokenRequest: filmixTokenRequest,
+    filmixDeviceStart: filmixDeviceStart, filmixDeviceCheck: filmixDeviceCheck,
+    filmixMaxQuality: filmixMaxQuality, filmixSearch: filmixSearch,
+    searchFilmixSmart: searchFilmixSmart, filmixScore: filmixScore,
+    filmixQualities: filmixQualities, filmixApplyQuality: filmixApplyQuality,
+    resolveFilmix: resolveFilmix, fmMapSet: fmMapSet, fmMapGet: fmMapGet
+  };
+
+  window.filmixTokenApi = {
+    get: fmToken,
+    set: function (t) { fmSetToken(t); fmProfileCache = { v: null, ts: 0 }; },
+    start: filmixDeviceStart,
+    check: filmixDeviceCheck,
+    profile: filmixMaxQuality,
+  };
+
+  window.injectFilmixSettings = function () {
+    /* Блок може бути або в модалці, або переміщений у сторінку налаштувань */
+    var box = document.getElementById('settings-online-box');
+    if (!box) {
+      var modal = document.getElementById('settings-online-modal');
+      box = modal && modal.querySelector('.settings-box');
+    }
+    if (!box || box.querySelector('#filmix-token')) return;
+    var sec = document.createElement('div');
+    sec.className = 'settings-section';
+    sec.innerHTML =
+      '<div class="settings-section-title">Filmix · мобільний API</div>' +
+      '<label class="settings-field-label" for="filmix-token">user_dev_token</label>' +
+      '<input id="filmix-token" class="settings-field" placeholder="Вставте готовий токен" autocomplete="off">' +
+      '<div class="settings-field-actions">' +
+        '<button class="settings-btn" id="filmix-save" type="button">Зберегти</button>' +
+        '<button class="settings-btn" id="filmix-profile" type="button">Перевірити якість</button>' +
+      '</div>' +
+      '<label class="settings-field-label" for="filmix-code">Прив\'язка пристрою</label>' +
+      '<div class="settings-field-actions">' +
+        '<button class="settings-btn" id="filmix-code" type="button">Отримати код</button>' +
+        '<button class="settings-btn" id="filmix-activate" type="button">Активувати</button>' +
+      '</div>' +
+      '<div id="filmix-status" class="settings-field-status"></div>';
+    box.appendChild(sec);
+    var input = sec.querySelector('#filmix-token');
+    var status = sec.querySelector('#filmix-status');
+    input.value = fmToken();
+    sec.querySelector('#filmix-save').addEventListener('click', function () {
+      window.filmixTokenApi.set(input.value.trim());
+      status.textContent = input.value.trim() ? 'Токен збережено' : 'Токен очищено';
+      filmixMaxQuality().then(function (q) {
+        status.textContent += ' · макс. ' + q + 'p';
+      });
+    });
+    sec.querySelector('#filmix-profile').addEventListener('click', function () {
+      filmixMaxQuality().then(function (q) {
+        status.textContent = 'Максимальна якість токена: ' + q + 'p';
+      }).catch(function (e) { status.textContent = 'Помилка: ' + e.message; });
+    });
+    sec.querySelector('#filmix-code').addEventListener('click', function () {
+      status.textContent = 'Запит коду…';
+      filmixDeviceStart().then(function (p) {
+        status.textContent = p.user_code
+          ? 'Код: ' + p.user_code + ' — введіть його на filmix.my/consoles, потім «Активувати»'
+          : 'Код не отримано — перевірте відповідь API';
+      }).catch(function (e) { status.textContent = 'Помилка: ' + e.message; });
+    });
+    sec.querySelector('#filmix-activate').addEventListener('click', function () {
+      status.textContent = 'Перевірка…';
+      filmixDeviceCheck().then(function (r) {
+        if (r.activated) {
+          input.value = r.token;
+          status.textContent = 'Активовано. Токен збережено.';
+        } else {
+          status.textContent = 'Ще не активовано. Код: ' + (r.user_code || '—');
+        }
+      }).catch(function (e) { status.textContent = 'Помилка: ' + e.message; });
+    });
   };
 })();

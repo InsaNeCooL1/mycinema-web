@@ -40,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Test
+        run: npm test
+
       - name: Build bundle
         run: npm run build
 
@@ -60,7 +63,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug -PMC_VERSION_CODE=${{ github.run_number }} -PMC_VERSION_NAME=1.0.${{ github.run_number }}
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/mycinema-web-debug.apk
@@ -73,6 +76,6 @@ jobs:
           name: MyCinema WEB Build ${{ github.run_number }}
           files: android/app/build/outputs/apk/debug/mycinema-web-debug.apk
           draft: false
-          prerelease: false
+          prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

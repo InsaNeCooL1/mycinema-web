@@ -1,7 +1,7 @@
 /* MyCinema WEB — Service Worker (PWA app shell) */
 'use strict';
 
-const CACHE = 'mycinema-web-v3';
+const CACHE = 'mycinema-web-v4';
 const SHELL = [
   './',
   './index.html',
@@ -43,8 +43,10 @@ self.addEventListener('fetch', (e) => {
   if (req.mode === 'navigate') {
     e.respondWith(
       fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put('./index.html', copy));
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put('./index.html', copy));
+        }
         return res;
       }).catch(() => caches.match('./index.html').then((r) => r || Response.error()))
     );

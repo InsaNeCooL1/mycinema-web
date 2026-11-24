@@ -236,33 +236,6 @@
   background: linear-gradient(135deg, rgba(var(--accent-rgb), .10), rgba(var(--accent-rgb), .03));
   border: 1px solid rgba(var(--accent-rgb), .24);
 }
-/* Показуємо режими лише там, де їх не ховає 10-card.css
-   (
-.recs-controls-bar .mood-pills {
-  flex: 1 1 320px;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  padding: 5px;
-  border-radius: var(--r-md);
-  background: linear-gradient(135deg, rgba(var(--accent-rgb), .10), rgba(var(--accent-rgb), .03));
-  border: 1px solid rgba(var(--accent-rgb), .24);
-}
-.recs-controls-bar .mood-pill {
-  height: 34px;
-}
-
-  /* Каскад: цей файл іде після 60-perf-home.css, тому перемагає за порядком. */
-  body #results .recs-controls-bar .mood-pills {
-    padding: 5px;
-    height: auto;
-    max-height: none;
-  }
-  body #results .recs-controls-bar .mood-pill {
-    height: 32px;
-  }
-
-
 /* FIX-DESKTOP-MOODS — настрої поруч із перемикачем «Фільми / Серіали». */
 .home-head-controls {
   display: flex;

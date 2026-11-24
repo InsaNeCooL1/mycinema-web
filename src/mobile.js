@@ -23,6 +23,24 @@
   const SHEET_PANEL = $('mob-sheet-panel');
   const SEARCH_PAGE = $('mob-search-page');
 
+  // ---- Мобільні SVG-іконки (без емодзі — фарбовані, як більшість іконок додатку) ----
+  const MV = {
+    search: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg>',
+    play: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5v14l11-7z"/></svg>',
+    check: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+    calendar: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4"/><path d="M16 2v4"/><path d="M3 10h18"/><path d="M8 14h4"/><path d="M12 14h4"/></svg>',
+    crown: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L9 8 3 8.5 12 14l5-5.5L21 8 12 2z"/></svg>',
+    eye: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+    sync: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4v6h-6"/><path d="M3 18v-6h6"/><path d="M3 9a7 7 0 0 1 14-3l-3.5 3.5"/><path d="M21 15a7 7 0 0 1-14 3l3.5-3.5"/></svg>',
+    gear: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.8l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.83-.33 1.65 1.65 0 0 0-1.17 1.52V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-.82-.33 1.65 1.65 0 0 0-1.51 1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+    dropped: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>',
+    notes: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M8 10h6M8 14h4"/></svg>',
+    film: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="1.5"/><path d="M7 3v18"/><path d="M17 3v18"/><path d="M2 9h20"/><path d="M2 15h20"/></svg>',
+    tv: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="13" rx="2"/><path d="M12 16v3"/></svg>',
+    heart: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>',
+    trash: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>'
+  };
+
   /* ---------- Top bar ---------- */
   function openMobSearch() {
     if (!SEARCH_PAGE) return;
@@ -168,7 +186,7 @@
   }
   function mobSheetItem(text, icon, fn, extra) {
     const b = el('button', 'mob-sheet-item' + (extra || ''));
-    if (icon) b.append(el('span', 'mob-sheet-icon', icon));
+    if (icon) { const iconSpan = el('span', 'mob-sheet-icon'); iconSpan.innerHTML = icon; b.append(iconSpan); }
     b.append(el('span', 'mob-sheet-label', text));
     b.addEventListener('click', (e) => { e.stopPropagation(); if (fn) fn(e); });
     return b;
@@ -177,36 +195,36 @@
   function openMobListsSheet() {
     mobSheet('Списки', (body) => {
       const list = [
-        ['▶️ Дивлюсь', 'watching'],
-        ['✅ Переглянуто', 'watched'],
-        ['📅 Планую', 'planned'],
-        ['🕸️ Закинуто', 'dropped'],
-        ['❤️ Улюблене', 'favorites']
+        ['Дивлюсь', MV.play, 'watching'],
+        ['Переглянуто', MV.check, 'watched'],
+        ['Планую', MV.calendar, 'planned'],
+        ['Закинуто', MV.dropped, 'dropped'],
+        ['Улюблене', MV.heart, 'favorites']
       ];
-      list.forEach(([label, tab]) => {
+      list.forEach(([label, icon, tab]) => {
         const count = Object.values(lib || {}).filter(x =>
           tab === 'favorites' ? x.favorite : x.status === tab).length;
-        body.append(mobSheetItem(`${label} · ${count}`, '', () => { mobSheetClose(); setTab(tab); }, ' mob-sheet-list-item'));
+        body.append(mobSheetItem(`${label} · ${count}`, icon, () => { mobSheetClose(); setTab(tab); }, ' mob-sheet-list-item'));
       });
     });
   }
 
   function openMobMoreSheet() {
     mobSheet('Меню/Ще', (body) => {
-      body.append(mobSheetItem('📅 Календар', '', () => { mobSheetClose(); setTab('calendar'); }));
-      body.append(mobSheetItem('👑 Цар гори', '', () => { mobSheetClose(); setTab('top'); }));
-      body.append(mobSheetItem('Обсерваторія', '', () => { mobSheetClose(); setTab('statistics'); }));
-      body.append(mobSheetItem('🔄 Синхронізація', '', () => { mobSheetClose(); syncFromSettings(); }));
-      body.append(mobSheetItem('⚙️ Налаштування', '', () => { mobSheetClose(); setTab('settings'); }));
+      body.append(mobSheetItem('Календар', MV.calendar, () => { mobSheetClose(); setTab('calendar'); }));
+      body.append(mobSheetItem('Цар гори', MV.crown, () => { mobSheetClose(); setTab('top'); }));
+      body.append(mobSheetItem('Обсерваторія', MV.eye, () => { mobSheetClose(); setTab('statistics'); }));
+      body.append(mobSheetItem('Синхронізація', MV.sync, () => { mobSheetClose(); syncFromSettings(); }));
+      body.append(mobSheetItem('Налаштування', MV.gear, () => { mobSheetClose(); setTab('settings'); }));
     });
   }
 
   function openMobFiltersSheet() {
     mobSheet('Фільтри', (body) => {
-      const opts = [{ id: 'all', label: 'Всі' }, { id: 'movie', label: '🎬 Фільми' }, { id: 'tv', label: '📺 Серіали' }];
+      const opts = [{ id: 'all', label: 'Всі' }, { id: 'movie', label: 'Фільми', icon: MV.film }, { id: 'tv', label: 'Серіали', icon: MV.tv }];
       const cur = state.typeFilter === 'movie' ? 'movie' : (state.typeFilter === 'tv' ? 'tv' : 'all');
       opts.forEach(o => {
-        body.append(mobSheetItem(o.label, '', () => { mobSheetClose(); setTypeFilter(o.id); }, o.id === cur ? ' mob-sheet-item-active' : ''));
+        body.append(mobSheetItem(o.label, o.icon || '', () => { mobSheetClose(); setTypeFilter(o.id); }, o.id === cur ? ' mob-sheet-item-active' : ''));
       });
     });
   }
@@ -217,7 +235,7 @@
     const isW = s.status === 'watched';
     mobSheet('Статуси', (body) => {
       const tv = r.type === 'tv';
-      const watchBtn = mobSheetItem(isW ? '✓ Переглянуто' : '▶ Дивлюсь', '', () => {
+      const watchBtn = mobSheetItem(isW ? 'Переглянуто' : 'Дивлюсь', isW ? MV.check : MV.play, () => {
         const newStatus = isW ? null : 'watched';
         let newEps = s.watchedEpisodes || [];
         if (tv && newStatus === 'watched') {
@@ -234,12 +252,12 @@
       }, ' mob-sheet-watch');
       if (isW) watchBtn.classList.add('active');
       body.append(watchBtn);
-      body.append(mobSheetItem('📅 Планую', '', () => { update(r, { status: s.status === 'planned' ? null : 'planned', watchedEpisodes: s.watchedEpisodes || [] }); mobSheetClose(); }));
-      body.append(mobSheetItem('🕸️ Закинуто', '', () => { update(r, { status: s.status === 'dropped' ? null : 'dropped', watchedEpisodes: s.watchedEpisodes || [] }); mobSheetClose(); }));
-      body.append(mobSheetItem('📝 Нотатки', '', () => { mobSheetClose(); window.openQuickNoteModal(ctx); }));
+      body.append(mobSheetItem('Планую', MV.calendar, () => { update(r, { status: s.status === 'planned' ? null : 'planned', watchedEpisodes: s.watchedEpisodes || [] }); mobSheetClose(); }));
+      body.append(mobSheetItem('Закинуто', MV.dropped, () => { update(r, { status: s.status === 'dropped' ? null : 'dropped', watchedEpisodes: s.watchedEpisodes || [] }); mobSheetClose(); }));
+      body.append(mobSheetItem('Нотатки', MV.notes, () => { mobSheetClose(); window.openQuickNoteModal(ctx); }));
       if (isW) {
         const rwCnt = s.rewatches || 0;
-        body.append(mobSheetItem(`🔁 Перегляд ×${rwCnt + 1}${rwCnt > 0 ? ' — зафіксувати' : ''}`, '', () => {
+        body.append(mobSheetItem(`Перегляд ×${rwCnt + 1}${rwCnt > 0 ? ' — зафіксувати' : ''}`, MV.sync, () => {
           const latest = lib[r.key] || s;
           const nextRw = (latest.rewatches || 0) + 1;
           update(r, { rewatches: nextRw, rewatchDates: [...(latest.rewatchDates || []), Date.now()], statusDate: Date.now() });
@@ -253,7 +271,7 @@
         }
       }
       if (lib[r.key]) {
-        body.append(mobSheetItem('🗑 Видалити', '', () => {
+        body.append(mobSheetItem('Видалити', MV.trash, () => {
           mobSheetClose();
           if (confirm('Видалити тайтл?')) {
             const snap = lib[r.key] || r;
@@ -266,7 +284,6 @@
     });
   }
 
-  /* ---------- Mobile search page ---------- */
   function initMobSearch() {
     if (!SEARCH_PAGE || !$('mob-search-input')) return;
     const input = $('mob-search-input');
@@ -333,7 +350,7 @@
       /* Трейлер — внизу зліва поверх градієнта */
       const tbtn = hero.querySelector('.btn-play, .btn-stop');
       if (tbtn) {
-        const t = el('button', 'mob-glass-btn mob-trailer', '▶ Трейлер');
+        const t = el('button', 'mob-glass-btn mob-trailer'); t.innerHTML = MV.play + ' Трейлер';
         t.type = 'button';
         t.onclick = tbtn.onClick || tbtn.onclick;
         floats.append(t);
@@ -368,10 +385,17 @@
       const st = card.querySelector('.mobile-statuses');
       if (st) st.remove();
     };
+    const after = (r) => { attach(); syncMobTop(); return r; };
     const _rc = window.renderCard;
-    window.renderCard = function (restore) { const r = _rc(restore); attach(); syncMobTop(); return r; };
+    window.renderCard = function (restore) {
+      const r = _rc(restore);
+      return (r && typeof r.then === 'function') ? r.then(after) : after(r);
+    };
     const _oc = window.openCard;
-    window.openCard = function (item) { const r = _oc(item); attach(); syncMobTop(); return r; };
+    window.openCard = function (item) {
+      const r = _oc(item);
+      return (r && typeof r.then === 'function') ? r.then(after) : after(r);
+    };
     const _cc = window.closeCard;
     window.closeCard = function () {
       const r = _cc();
@@ -410,7 +434,11 @@
     const _osp = window.openStreamPicker;
     window.openStreamPicker = function () {
       const r = _osp.apply(this, arguments);
-      if (isMobShell()) r.classList.add('mob-streams-sheet');
+      /* openStreamPicker нічого не повертає — беремо реальний оверлей з DOM */
+      if (isMobShell()) {
+        const ov = document.getElementById('streams-overlay');
+        if (ov) ov.classList.add('mob-streams-sheet');
+      }
       return r;
     };
   }

@@ -1,54 +1,80 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
+const HOME_HTML = `var dle_login_hash = 'abc123def456';`;
 const SEARCH_HTML = `
-<a href="https://uakinogo.is/4850-chelovek-pauk-novyj-den.html">Человек-паук: Новый день (2026)</a>`;
+<a href="https://uakinogo.is/4850-chelovek-pauk-novyj-den.html"><span class="searchheading">Человек-паук: Новый день (2026)</span><span>Опис</span></a>
+<a href="https://kinogo.is/174-posledniaia-duel.html"><span class="searchheading">Последняя дуэль (2021)</span><span>Опис</span></a>
+<span class="notfound">Похожих статей на сайте не найдено.</span>`;
+const GARBAGE_HTML = `
+<a href="https://uakinogo.is/6394-serdce-zverya.html"><span class="searchheading">Сердце зверя (2026)</span><span>Опис</span></a>
+<a href="https://uakinogo.is/2614-odisseja.html"><span class="searchheading">Одиссея (2026)</span><span>Опис</span></a>`;
 const PAGE_HTML = `<div><iframe src="https://api.embf.net/embed/movie/90039"></iframe></div>`;
-const EMBED_HTML = `
-makePlayer({
-  source: {
-    hls: "https://cdn.interkh.com/x/CYVNV5TP.mp4/master.m3u8?t=1",
-    audio: {"names":["MovieDalen","LeDoyen (укр)","Eng.Original"],"order":[0,1,2]},
-    cc: [{"url":"https://cdn.interkh.com/x/uk.vtt","name":"Укр. повні - 2"}]
-  }
-});`;
-const MASTER = `#EXTM3U
-#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio0",NAME="rus0",LANGUAGE="ru",URI="a1.m3u8"
-#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio0",NAME="ukr5",LANGUAGE="uk",URI="a6.m3u8"`;
+
+function mockFetch(html) {
+  const calls = [];
+  global.fetch = vi.fn((u, init) => {
+    const url = String(u);
+    calls.push({ url, init });
+    let body = '';
+    // URL у проксі закодований: controller.php%3Fmod%3Dsearch
+    if (url.includes('controller.php')) body = html;
+    else if (url.includes('workers.dev') && url.includes('uakinogo.is%2F')) body = HOME_HTML;
+    else if (/r\.jina\.ai\/https:\/\/uakinogo\.is\/\d+-/.test(url)) body = PAGE_HTML;
+    else if (url.includes('r.jina.ai')) body = HOME_HTML;
+    return Promise.resolve({ ok: true, text: () => Promise.resolve(body) });
+  });
+  return calls;
+}
 
 beforeAll(() => {
   window.loadScript('src/streams.js');
 });
 
 describe('EmbF provider', () => {
-  it('searches the source site', async () => {
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true, text: () => Promise.resolve(SEARCH_HTML) }));
+  it('шукає через AJAX POST, а не GET-каталог, і бере рік із назви', async () => {
+    const calls = mockFetch(SEARCH_HTML);
     const res = await window._streamsUtil.searchEmbf('Человек-паук');
-    expect(res.length).toBe(1);
-    expect(res[0].provider).toBe('embf');
+    expect(res).toHaveLength(2);
     expect(res[0].href).toContain('4850-chelovek-pauk-novyj-den.html');
+    expect(res[0].year).toBe('2026');
+    expect(res[1].href).toContain('uakinogo.is'); // kinogo.is нормалізовано
+    const post = calls.find((c) => c.url.includes('controller.php'));
+    expect(post.init.method).toBe('POST');
+    expect(post.init.body).toContain('query=');
+    expect(post.init.body).toContain('user_hash=abc123def456');
   });
 
-  it('uses uaserials.pro as the primary UASerials source', async () => {
-    const urls = [];
-    global.fetch = vi.fn((u) => {
-      const url = String(u);
-      urls.push(url);
-      const body = url.includes('uaserials.pro')
-        ? '<a href="https://uaserials.pro/123-test.html">Test</a>'
-        : '<html></html>';
-      return Promise.resolve({ ok: true, text: () => Promise.resolve(body) });
-    });
-    await window._streamsUtil.searchUASerialsMirror('test');
-    expect(urls.some((u) => u.includes('uaserials.pro'))).toBe(true);
-    expect(urls.some((u) => u.includes('uaserials.my'))).toBe(false);
+  it('жорстко відсіює випадковий топ-10 каталогу', async () => {
+    mockFetch(GARBAGE_HTML);
+    const res = await window._streamsUtil.searchEmbfSmart('Нація Z', 'Z Nation', 'Нация Z', 2014);
+    expect(res).toEqual([]);
   });
 
-  it('resolves to the native EmbF iframe player', async () => {
+  it('приймає збіг за російською назвою TMDB', async () => {
+    mockFetch(SEARCH_HTML);
+    const res = await window._streamsUtil.searchEmbfSmart('Человек-паук', 'Spider-Man', 'Человек-паук', 2026);
+    expect(res.length).toBeGreaterThan(0);
+    expect(res[0].title).toContain('Человек-паук');
+  });
+
+  it('оновлює hash, якщо сесія сайту застаріла', async () => {
+    let n = 0;
     global.fetch = vi.fn((u) => {
       const url = String(u);
-      const body = url.includes('r.jina.ai') ? PAGE_HTML : '';
+      let body = '';
+      if (url.includes('controller.php')) body = (n++ === 0)
+        ? 'Ваша пользовательская сессия истекла, перезагрузите страницу'
+        : SEARCH_HTML;
+      else if (url.includes('workers.dev') && url.includes('uakinogo.is%2F')) body = HOME_HTML;
+      else if (url.includes('r.jina.ai')) body = PAGE_HTML;
       return Promise.resolve({ ok: true, text: () => Promise.resolve(body) });
     });
+    const res = await window._streamsUtil.searchEmbf('Человек-паук');
+    expect(res).toHaveLength(2);
+  });
+
+  it('резолвить картку в рідний EmbF iframe', async () => {
+    mockFetch(SEARCH_HTML);
     const out = await window._streamsUtil.resolveEmbf({
       href: 'https://uakinogo.is/4850-chelovek-pauk-novyj-den.html'
     });

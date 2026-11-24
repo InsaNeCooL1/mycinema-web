@@ -15,7 +15,8 @@ function pushCardState() {
   else if (ctx.type === 'company') st.ctx = { type: 'company', id: ctx.id };
   else if (ctx.type === 'streaming') st.ctx = { type: 'streaming', id: ctx.id };
   else st.ctx = { type: 'media', id: ctx.item.id, media_type: ctx.item.type, key: ctx.item.key };
-  history.pushState(st, '', hashFor(ctx));
+  /* У пісочниці/file:// pushState може кинути — картка має відкритись усе одно */
+  try { history.pushState(st, '', hashFor(ctx)); } catch (e) {}
 }
 function saveCardScroll() {
   const s = card.querySelector('.card-scroll');
@@ -123,8 +124,9 @@ async function openCard(r) {
   overlay.classList.add("open");
   const ctx = makeMediaCtx(r);
   cardStack = [ctx];
-  pushCardState();
+  /* Спочатку малюємо каркас — інакше збій history залишає порожній оверлей */
   renderLoading();
+  pushCardState();
   await loadMediaCardData(ctx);
   if (cardStack[cardStack.length - 1] !== ctx) return;
   renderCard();
@@ -136,8 +138,8 @@ async function openMediaFromStack(item) {
   saveCardScroll();
   const ctx = makeMediaCtx(item);
   cardStack.push(ctx);
-  pushCardState();
   renderLoading();
+  pushCardState();
   await loadMediaCardData(ctx);
   if (cardStack[cardStack.length - 1] !== ctx) return;
   renderCard();
@@ -343,6 +345,8 @@ async function loadMediaForForward(s) {
 }
 
 window.addEventListener('popstate', async (e) => {
+  /* Мобільні шити/пошук пушать записи без mc — вони не є картками */
+  if (e.state && (e.state.mcSheet || e.state.mcSearch)) return;
   const depth = (e.state && e.state.mc) || 0;
   if (depth === cardStack.length) return;
 
@@ -394,7 +398,7 @@ function renderCard(restore) {
 
   const prevScroll = card.querySelector('.card-scroll');
   const savedScroll = restore ? (ctx.scroll || 0) : (prevScroll ? prevScroll.scrollTop : 0);
-  card.classList.toggle('is-person', ctx.type === 'person' || ctx.type === 'company');
+  card.classList.toggle('is-person', ctx.type === 'person' || ctx.type === 'company' || ctx.type === 'streaming');
   card.innerHTML = '';
   if (ctx.type === 'media') {
     const glowPath = ctx.item?.backdrop || ctx.details?.backdrop_path || ctx.item?.poster || ctx.details?.poster_path;
@@ -407,17 +411,17 @@ function renderCard(restore) {
   card.append(cardBar());
   const scroll = el('div', 'card-scroll');
   card.append(scroll);
-  if (ctx.type === 'media' && !ctx.details && !ctx.error) scroll.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Завантаження...</div>';
-  else if (ctx.error) scroll.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${escapeHtml(ctx.error)}</div>`; /* FIX-CARD-ERR-ESC */
-  else if (ctx.type === 'person') renderPersonCard(ctx, scroll);
-  else if (ctx.type === 'company') renderCompanyCard(ctx, scroll);
-  else if (ctx.type === 'streaming' && typeof renderStreamingCard === 'function') renderStreamingCard(ctx, scroll);
-  else {
-    if (typeof renderDesktopCard === 'function') {
-      renderDesktopCard(ctx, scroll);
-    } else {
-      scroll.innerHTML = '<div style="text-align:center; padding:40px; color:var(--danger);">UI картки не завантажено</div>';
-    }
+  try {
+    if (ctx.type === 'media' && !ctx.details && !ctx.error) scroll.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Завантаження...</div>';
+    else if (ctx.error) scroll.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${escapeHtml(ctx.error)}</div>`; /* FIX-CARD-ERR-ESC */
+    else if (ctx.type === 'person') renderPersonCard(ctx, scroll);
+    else if (ctx.type === 'company') renderCompanyCard(ctx, scroll);
+    else if (ctx.type === 'streaming' && typeof renderStreamingCard === 'function') renderStreamingCard(ctx, scroll);
+    else if (typeof renderDesktopCard === 'function') renderDesktopCard(ctx, scroll);
+    else scroll.innerHTML = '<div style="text-align:center; padding:40px; color:var(--danger);">UI картки не завантажено</div>';
+  } catch (e) {
+    /* Будь-який збій конструкторів не лишає порожнього екрана */
+    scroll.innerHTML = '<div style="text-align:center; padding:40px; color:var(--danger);">Помилка рендеру картки: ' + escapeHtml(String((e && e.message) || e)) + '</div>';
   }
   if (savedScroll > 0) {
     scroll.scrollTop = savedScroll;

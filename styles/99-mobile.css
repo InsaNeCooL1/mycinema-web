@@ -101,6 +101,7 @@
     cursor: pointer; transition: .2s;
   }
   .mob-nav-btn span { letter-spacing: .02em; }
+  .mob-nav-icon { width: 22px; height: 22px; flex: 0 0 auto; display: block; }
   .mob-nav-btn.active { color: var(--accent); font-weight: 700; }
   .mob-nav-btn.active::before, .mob-nav-btn.active::after { display: none; }
   .mob-nav-btn:active { color: var(--text); background: rgba(255, 255, 255, .05); }
@@ -150,6 +151,8 @@
   .mob-sheet-item-icon { flex-shrink: 0; }
   .mob-sheet-item-label { flex: 1 1 auto; }
   .mob-sheet-item .badge { font-size: 12px; color: var(--text-muted); }
+  .mob-sheet-icon { flex-shrink: 0; display: flex; align-items: center; }
+  .mob-sheet-icon svg { width: 15px; height: 15px; display: block; }
 
   /* ---- Статус-сілаба (glass button replacing inline statuses) ---- */
   .mob-statuses-btn {
@@ -296,7 +299,7 @@
   .mobile-tabs-wrap .card-tab-content { padding: 0 8px; }
 
   /* Person/company mobile: горизонтальна шапка */
-  #card.is-person #card-scroll { flex-direction: row; gap: 14px; }
+  #card.is-person .card-scroll { flex-direction: row; gap: 14px; }
   #card.is-person .person-header { flex-direction: row; align-items: center; gap: 14px; }
   #card.is-person .person-photo { width: 92px; height: 92px; }
 
@@ -334,8 +337,8 @@
   .mob-sheet-meta { font-size: 12px; color: var(--text-muted); padding: 6px 14px 10px; }
   .mob-sheet-item-active { color: var(--accent); font-weight: 700; background: rgba(var(--accent-rgb), .12); }
   .mob-sheet-item-danger { color: var(--danger); font-weight: 600; }
-  .mob-sheet-item-danger:active { background: rgba(var(--danger), .12); }
-  .mob-glass-btn.active { border-color: rgba(var(--coral), .45); background: rgba(var(--coral), .15); }
+  .mob-sheet-item-danger:active { background: rgba(255, 92, 92, .12); }
+  .mob-glass-btn.active { border-color: rgba(255, 123, 92, .45); background: rgba(255, 123, 92, .15); }
 
   /* Filter bar (visible, compact; opens filters sheet on mobile) */
   .filter-bar { margin: 6px 12px 10px; padding: 4px; border-radius: 999px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .06); }
@@ -577,4 +580,10 @@
   #mob-search-page { height: 100dvh; }
   #overlay { height: 100dvh; }
   #card { min-height: 100dvh; }
+}
+
+/* Планшети 768–899: мобільний топбар ще прихований, сайдбар перекритий
+   карткою — лишаємо нативну кнопку «← Назад». */
+@media (min-width: 768px) and (max-width: 899px) {
+  #card .card-bar { display: flex !important; }
 }
