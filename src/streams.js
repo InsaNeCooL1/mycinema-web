@@ -755,7 +755,8 @@
     // Відкриваємо рідний плеєр EmbF у iframe — там його власні селектори
     // якості й озвучки виглядають саме так, як на сайті-джерелі.
     return jinaPx(cand.href).then(function (html) {
-      var m = html.match(/(?:https?:)?\/\/api\.embf\.net\/embed\/(?:movie|serial)\/\d+/i);
+      /* Сайт переїхав з api.embf.net на api.datavex.ws — приймаємо обидва. */
+      var m = html.match(/(?:https?:)?\/\/(?:api\.)?(?:embf\.net|datavex\.ws)\/embed\/(?:movie|serial)\/\d+/i);
       if (!m) throw new Error('EmbF: embed не знайдено');
       var embedUrl = m[0].replace(/^\/\//, 'https://');
       return [{
@@ -1589,6 +1590,12 @@
       });
     }
 
+    /* Дозволяємо додавати провайдерів у міру надходження, не чекаючи решти. */
+    ov._mcRefreshProviders = function (forceLoad) {
+      renderProvidersBar();
+      if (forceLoad) loadCurrentProvider();
+    };
+
     renderProvidersBar();
     loadCurrentProvider();
   }
@@ -1607,7 +1614,25 @@
       body.innerHTML = '<div class="streams-error">Порожня назва</div>';
       return;
     }
-    body.innerHTML = '<div class="streams-status">Пошук «' + esc(q || origTitle) + '»…</div>';
+    var searchText = '<div class="streams-status">Пошук «' + esc(q || origTitle) + '»…</div>';
+    body.innerHTML = searchText;
+
+    /* Показуємо кімнату й порожній рядок джерел одразу. Кожен провайдер
+       додається окремо, коли знайшовся, — не чекаємо на всі три пошуки. */
+    var providers = [];
+    var roomCardObj = {
+      key: mediaKey, tmdbId: tmdbId, type: type, title: q || origTitle,
+      origTitle: origTitle || q, year: year, imdbId: imdbId, season: '', episode: ''
+    };
+    renderUnifiedPicker(providers, q || origTitle, mediaKey, roomCardObj);
+    body.innerHTML = searchText;
+
+    function addProvider(p) {
+      if (!ov.isConnected || !p || !p.results || !p.results.length) return;
+      var wasEmpty = providers.length === 0;
+      providers.push(p);
+      if (ov._mcRefreshProviders) ov._mcRefreshProviders(wasEmpty);
+    }
 
     var ashdiP = lookupAshdi(imdbId, tmdbId, type, q).then(function (href) {
       if (!href) return [];
@@ -1627,29 +1652,20 @@
     var tortugaP = localizedP.then(function (ruTitle) {
       return searchKinoukrSmart(q, origTitle, ruTitle, year, type);
     });
-    Promise.allSettled([ashdiP, embfP, tortugaP]).then(function (results) {
-      if (!body || !body.isConnected) return;
-      var ashdi = results[0].status === 'fulfilled' ? results[0].value : [];
-      var embf = results[1].status === 'fulfilled' ? results[1].value : [];
-      var tortuga = results[2].status === 'fulfilled' ? results[2].value : [];
+    ashdiP.then(function (list) {
+      addProvider(list.length ? { id: 'ashdi', label: 'Ashdi', results: list } : null);
+    }, function () {});
+    embfP.then(function (list) {
+      addProvider(list.length ? { id: 'embf', label: 'EmbF', results: list } : null);
+    }, function () {});
+    tortugaP.then(function (list) {
+      addProvider(list.length ? { id: 'tortuga', label: 'Tortuga', results: list } : null);
+    }, function () {});
 
-      var providers = [];
-      if (ashdi.length) providers.push({ id: 'ashdi', label: 'Ashdi', results: ashdi });
-      if (embf.length) providers.push({ id: 'embf', label: 'EmbF', results: embf });
-      if (tortuga.length) providers.push({ id: 'tortuga', label: 'Tortuga', results: tortuga });
-
-      if (!providers.length) {
+    Promise.allSettled([ashdiP, embfP, tortugaP]).then(function () {
+      if (ov.isConnected && !providers.length) {
         body.innerHTML = '<div class="streams-error">Нічого не знайдено</div>';
-        return;
       }
-
-      renderUnifiedPicker(providers, q || origTitle, mediaKey, {
-        key: mediaKey, tmdbId: tmdbId, type: type, title: q || origTitle,
-        origTitle: origTitle || q, year: year, imdbId: imdbId, season: '', episode: ''
-      });
-    }).catch(function (e) {
-      if (!body || !body.isConnected) return;
-      body.innerHTML = '<div class="streams-error">Помилка: ' + esc(e.message) + '</div>';
     });
   }
 

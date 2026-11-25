@@ -186,6 +186,26 @@
     else if (stage.requestFullscreen) stage.requestFullscreen();
   }
 
+  /* Плей/пауза: пробіл і клік по будь-якому місцю відео/сцени.
+     Кліки по контролах і селектору озвучки не перемикаємо. */
+  function togglePlayback() {
+    if (!video) return;
+    if (video.paused) video.play().catch(function () {});
+    else video.pause();
+  }
+  stage.addEventListener('click', function (e) {
+    if (e.target.closest('.mc-pc, #audio-wrap, #hud, #loader')) return;
+    togglePlayback();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== ' ' && e.key !== 'Spacebar') return;
+    var tag = (e.target && e.target.tagName) || '';
+    if (/INPUT|TEXTAREA|SELECT|BUTTON/.test(tag)) return;
+    e.preventDefault();
+    e.stopPropagation(); // щоб MCPlayerControls не перемкнув другий раз
+    togglePlayback();
+  }, true);
+
   function hideLoader() {
     if (loaderHidden) return;
     loaderHidden = true;
