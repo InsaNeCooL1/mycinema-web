@@ -2,6 +2,7 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-store">
 <title>MyCinema · Плеєр</title>
 <style>
   :root {
@@ -79,7 +80,7 @@
 <body>
 <div id="stage">
   <div id="preload"><i></i></div>
-  <video id="video" autoplay playsinline crossorigin="anonymous"></video>
+  <video id="video" autoplay playsinline></video>
   <div id="audio-wrap" hidden>
     <span>Озвучка:</span>
     <select id="audio-sel" aria-label="Вибір озвучки"></select>
@@ -95,7 +96,7 @@
   </div>
 </div>
 <script src="src/player-overlay.js"></script>
-<script src="src/player-controls.js"></script>
+<script src="src/player-controls.js?v=2"></script>
 <script>
 (function () {
   'use strict';
@@ -127,6 +128,58 @@
   var hideTimer = null;
   var loaderHidden = false;
   var hlsInstance = null, statsStarted = false, pendingSeek = 0;
+  var streamStart = 0; // зсув часу для fMP4 з ?start=: video.currentTime рахується з 0
+
+  function isFragmented(u) {
+    try { return /\/stream\/?$/.test(new URL(u || src, location.href).pathname); }
+    catch (e) { return false; }
+  }
+  function startOf(u) {
+    try { return Math.max(0, Number(new URL(u, location.href).searchParams.get('start')) || 0); }
+    catch (e) { return 0; }
+  }
+
+  /* fMP4 з pipe не має тривалості в moov — беремо її з ?duration= (кімната)
+     або з метаданих файлу в роздачі. /probe потоку показує лише підвантажену
+     частину, тому для торрент-джерела він непридатний. */
+  function applyFullDuration(sec) {
+    sec = Number(sec) || 0;
+    if (sec > 0 && controls && typeof controls.setTotalDuration === 'function') {
+      controls.setTotalDuration(Math.floor(sec));
+    }
+  }
+  function resolveFragmentedDuration() {
+    var u;
+    try { u = new URL(src, location.href); } catch (e) { return; }
+    if (sourceDuration(src) > 0) return;
+    var original = u.searchParams.get('url');
+    if (!original) return;
+    try {
+      var ou = new URL(original);
+      var th = ou.searchParams.get('link'), ti = ou.searchParams.get('index');
+      if (th && ti) {
+        fetch(u.origin + '/torr/ffp/' + encodeURIComponent(th) + '/' + encodeURIComponent(ti), { cache: 'no-store' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) { applyFullDuration(d && d.format && d.format.duration); })
+          .catch(function () {});
+        return;
+      }
+    } catch (e) {}
+    fetch(u.origin + '/probe?url=' + encodeURIComponent(original), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { applyFullDuration(d && d.duration); })
+      .catch(function () {});
+  }
+
+  /* Перемотка фрагментованого потоку — не currentTime, а новий src із ?start=. */
+  function seekFragmented(sec) {
+    var u;
+    try { u = new URL(src, location.href); } catch (e) { return; }
+    var target = Math.max(0, Math.floor(sec));
+    u.searchParams.set('start', String(target));
+    streamStart = target;
+    loadUrl(u.href, false);
+  }
 
   function toggleFullscreen() {
     if (document.fullscreenElement) document.exitFullscreen();
@@ -220,12 +273,41 @@
   }
 
   /* Єдина точка зміни джерела: і для оверлею, і для вибору аудіодоріжки. */
+  /* Повна тривалість приходить від кімнати/проксі (?duration=сек), бо HLS-плейлист
+     на початку містить лише перші сегменти й video.duration росте поступово. */
+  function sourceDuration(u) {
+    try {
+      var n = Number(new URL(u || src, location.href).searchParams.get('duration'));
+      return n > 0 ? n : 0;
+    } catch (e) { return 0; }
+  }
+
   function loadUrl(url, keepTime) {
     try { pendingSeek = keepTime ? (video.currentTime || 0) : 0; } catch (e) { pendingSeek = 0; }
+    var fragNext = isFragmented(url);
+    if (fragNext && keepTime) {
+      try {
+        var u = new URL(url, location.href);
+        var at = Math.floor(streamStart + (video.currentTime || 0));
+        u.searchParams.set('start', String(Math.max(0, at)));
+        url = u.href;
+      } catch (e) {}
+    }
     src = url;
-    if (hlsInstance) hlsInstance.loadSource(src);
-    else { video.src = src; video.load(); }
+    if (fragNext) streamStart = startOf(src);
+    if (controls) {
+      if (typeof controls.setTimeOffset === 'function') controls.setTimeOffset(fragNext ? streamStart : 0);
+      if (typeof controls.setTotalDuration === 'function') controls.setTotalDuration(sourceDuration(src));
+    }
+    if (hlsInstance && !fragNext) {
+      hlsInstance.loadSource(src);
+    } else {
+      if (hlsInstance) { try { hlsInstance.destroy(); } catch (e) {} hlsInstance = null; }
+      video.src = src;
+      video.load();
+    }
     video.play().catch(function () {});
+    if (fragNext) resolveFragmentedDuration();
   }
 
   function loadVariant(v, keepTime) {
@@ -272,6 +354,9 @@
         host: stage,
         video: video,
         title: title,
+        totalDuration: sourceDuration(src),
+        timeOffset: isFragmented(src) ? streamStart : 0,
+        onSeek: isFragmented(src) ? seekFragmented : null,
         onMenu: overlay && overlay.hasOptions() ? function () { overlay.toggle(); } : null,
         onFullscreen: toggleFullscreen,
         onBack: function () { window.close(); }
@@ -285,11 +370,25 @@
     statsStarted = true;
     var u;
     try { u = new URL(src, location.href); } catch(e) { return; }
-    var m = u.pathname.match(/\/gst\/([^/]+)\//);
-    var hash = m ? m[1] : (u.searchParams.get('link') || '');
+    var hash = '', idx = '1', base = u.origin;
+    var original = u.searchParams.get('url'); // fMP4-проксі: оригінальний потік у ?url=
+    if (original) {
+      try {
+        var ou = new URL(original);
+        var gm = ou.pathname.match(/\/gst\/([^/]+)\//);
+        hash = gm ? gm[1] : (ou.searchParams.get('link') || '');
+        idx = ou.searchParams.get('index') || '1';
+        base = u.origin + '/torr';
+      } catch (e) {}
+    }
+    if (!hash) {
+      var m = u.pathname.match(/\/gst\/([^/]+)\//);
+      hash = m ? m[1] : (u.searchParams.get('link') || '');
+      idx = u.searchParams.get('index') || '1';
+    }
     if (!hash) return;
-    var endpoint = u.origin + '/gst/' + encodeURIComponent(hash) + '/heartbeat?index=' +
-      encodeURIComponent(u.searchParams.get('index') || '1');
+    var endpoint = base + '/gst/' + encodeURIComponent(hash) + '/heartbeat?index=' +
+      encodeURIComponent(idx);
     var lastBytes=null, lastTs=0;
 
     setInterval(function () {
@@ -360,7 +459,27 @@
     }
   }
 
-  if (window.Hls) start(window.Hls);
+  /* Нативний <video src=".../stream?...">: fMP4 не потребує hls.js і не
+     перевіряє CORS. Тривалість і перемотку малюємо самі. */
+  function startFragmented() {
+    streamStart = startOf(src);
+    video.src = src;
+    if (variants[0]) { desiredAudioLang = variants[0].audioLang || ''; setTitle(variants[0]); }
+    mountUI();
+    if (controls && typeof controls.setTimeOffset === 'function') controls.setTimeOffset(streamStart);
+    video.addEventListener('error', function () { showLoaderError('Не вдалося відкрити потік'); });
+    video.addEventListener('loadedmetadata', function () {
+      // video.duration для fMP4 з pipe показує лише завантажену частину —
+      // повертаємо відому повну тривалість після кожного перезавантаження src
+      if (sourceDuration(src) > 0 && controls) controls.setTotalDuration(sourceDuration(src));
+      video.play().catch(function () {});
+      initStats();
+    });
+    resolveFragmentedDuration();
+  }
+
+  if (isFragmented(src)) startFragmented();
+  else if (window.Hls) start(window.Hls);
   else {
     var s = document.createElement('script');
     s.src='https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js';

@@ -1323,7 +1323,7 @@
     return ov;
   }
 
-  function renderUnifiedPicker(providers, mediaTitle, mediaKey) {
+  function renderUnifiedPicker(providers, mediaTitle, mediaKey, roomCard) {
     var ov = document.getElementById('streams-overlay');
     if (!ov) return;
     var provBar = ov.querySelector('#streams-providers');
@@ -1350,6 +1350,20 @@
     function renderProvidersBar() {
       provBar.style.display = 'flex';
       provBar.innerHTML = '';
+
+      /* «Кімната» — перша вкладка, поруч із балансерами. */
+      if (window.mcRoom && window.mcRoom.enabled()) {
+        var roomBtn = document.createElement('button');
+        roomBtn.type = 'button';
+        roomBtn.className = 'streams-prov-btn streams-room-btn';
+        roomBtn.textContent = '🏠 Кімната';
+        roomBtn.addEventListener('click', function () {
+          if (typeof window.closeStreamPicker === 'function') window.closeStreamPicker();
+          window.mcRoom.open(roomCard || { key: mediaKey, title: mediaTitle });
+        });
+        provBar.appendChild(roomBtn);
+      }
+
       providers.forEach(function (p, i) {
         var btn = document.createElement('button');
         btn.type = 'button';
@@ -1526,6 +1540,7 @@
         playBtn.addEventListener('click', function () { playVariants(playable, epMeta); });
         body.appendChild(playBtn);
       }
+
     }
 
     function loadCurrentProvider() {
@@ -1628,7 +1643,10 @@
         return;
       }
 
-      renderUnifiedPicker(providers, q || origTitle, mediaKey);
+      renderUnifiedPicker(providers, q || origTitle, mediaKey, {
+        key: mediaKey, tmdbId: tmdbId, type: type, title: q || origTitle,
+        origTitle: origTitle || q, year: year, imdbId: imdbId, season: '', episode: ''
+      });
     }).catch(function (e) {
       if (!body || !body.isConnected) return;
       body.innerHTML = '<div class="streams-error">Помилка: ' + esc(e.message) + '</div>';

@@ -114,3 +114,42 @@ describe('SYNC-FIELD-MERGE — паралельні правки не затир
     expect(res.deleted['movie-11']).toBeUndefined();
   });
 });
+
+describe('CAL-STATUS-TS — дата статусу не губиться при злитті', () => {
+  const day = 24 * 60 * 60 * 1000;
+
+  it('оновлення метаданих (updated) не переписує дату статусу', () => {
+    const now = Date.now();
+    const statusTs = now - 5 * day;
+    const local = { 'movie-20': { key: 'movie-20', status: 'watched', statusDate: statusTs, cast: ['A'], updated: now } };
+    const cloud = { 'movie-20': { key: 'movie-20', status: 'watched', statusDate: statusTs, updated: statusTs } };
+    const res = window.mergeLibraries(local, {}, cloud, {});
+    expect(res.items['movie-20'].statusDate).toBe(statusTs);
+  });
+
+  it('новіший статус з хмари перемагає старіший локальний попри свіжий updated', () => {
+    const now = Date.now();
+    const local = { 'movie-21': { key: 'movie-21', status: 'watched', statusDate: now - 10 * day, updated: now } };
+    const cloud = { 'movie-21': { key: 'movie-21', status: 'planned', statusDate: now - day, updated: now - 10 * day } };
+    const res = window.mergeLibraries(local, {}, cloud, {});
+    expect(res.items['movie-21'].status).toBe('planned');
+    expect(res.items['movie-21'].statusDate).toBe(now - day);
+  });
+
+  it('легасі-запис без statusDate отримує фіксовану дату з createdAt', () => {
+    const now = Date.now();
+    const createdAt = now - 7 * day;
+    const local = { 'movie-22': { key: 'movie-22', status: 'watched', createdAt, updated: now } };
+    const res = window.mergeLibraries(local, {}, {}, {});
+    expect(res.items['movie-22'].statusDate).toBe(createdAt);
+  });
+
+  it('load() backfill-ить statusDate для старих записів у localStorage', () => {
+    const now = Date.now();
+    const createdAt = now - 3 * day;
+    localStorage.setItem(window.LS, JSON.stringify({
+      'movie-23': { key: 'movie-23', status: 'watched', createdAt, updated: now }
+    }));
+    expect(window.load()['movie-23'].statusDate).toBe(createdAt);
+  });
+});

@@ -253,6 +253,12 @@ body.mc-fs {
   box-shadow: 0 4px 18px rgba(var(--accent-rgb), .28); transition: .15s; text-align: center;
 }
 .streams-play-btn:hover { transform: translateY(-1px); }
+.streams-room-btn {
+  width: 100%; margin-top: 8px; padding: 12px 16px; border-radius: var(--r-sm); font-size: 14px; font-weight: 700;
+  background: transparent; color: var(--accent); border: 1px solid var(--accent); transition: .15s; text-align: center;
+}
+.streams-room-btn:hover { background: rgba(var(--accent-rgb), .12); }
+.streams-providers .streams-room-btn { width:auto; margin-top:0; padding:7px 14px; font-size:13px; }
 .streams-ep-list { display: flex; flex-direction: column; gap: 6px; }
 .streams-ep-btn {
   background: var(--bg-2); color: var(--text); border: 1px solid rgba(var(--white-rgb), .05);

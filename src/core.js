@@ -694,6 +694,10 @@ function load() {
     });
     try { localStorage.setItem(LS, JSON.stringify(data)); localStorage.setItem(LS_VER, "2"); } catch {}
   }
+  /* [CAL-STATUS-TS] Легасі-записи зі статусом, але без statusDate, мають
+     отримати фіксовану дату один раз при завантаженні. Інакше календар
+     бере updated і «переїжджає» між місяцями при кожній правці тайтлу. */
+  Object.values(data).forEach(item => { if (item) preserveItemTimestamps(item); });
   return data;
 }
 // ---- tombstones (видалені тайтли) ----
@@ -742,10 +746,15 @@ function _valEq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 function _fieldTs(item, field) {
   if (!item) return 0;
   const ft = item._fieldTs && item._fieldTs[field];
-  if (ft) return Number(ft) || 0;
-  /* легасі-поля, які вже мають власні таймстемпи */
-  if (field === 'status') return Number(item.statusDate) || 0;
-  if (field === 'ratings') return Number(item.ratingUpdated) || 0;
+  if (ft) {
+    const ts = Number(ft);
+    if (ts) return ts;
+  }
+  /* легасі-поля, які вже мають власні таймстемпи.
+     statusDate/ratingUpdated теж мають порівнюватись САМІ по собі,
+     інакше оновлення метаданих (updated) відкочує дату статусу. */
+  if (field === 'status' || field === 'statusDate') return Number(item.statusDate) || 0;
+  if (field === 'ratings' || field === 'ratingUpdated') return Number(item.ratingUpdated) || 0;
   return Number(item.updated) || 0;
 }
 
@@ -777,11 +786,23 @@ function _mergeItem(a, b) {
     ft[f] = Math.max(Number(a._fieldTs && a._fieldTs[f]) || 0, Number(b._fieldTs && b._fieldTs[f]) || 0);
   }
 
-  /* Супутні таймстемпи мають відповідати вибраному значенню поля. */
-  if ('status' in out && out.status) {
-    const src = _valEq(out.status, a.status) ? a : b;
-    out.statusDate = _fieldTs(src, 'status') || out.updated || Date.now();
-    ft.status = out.statusDate;
+  /* Супутні таймстемпи мають відповідати вибраному значенню поля.
+     [CAL-STATUS-TS] Дата статусу — це не `updated`: вона не повинна
+     відкочуватись через пізніше оновлення метаданих чи оцінок. Якщо
+     статус однаковий на обох пристроях, беремо найпізнішу дату. */
+  if (out.status) {
+    const at = _fieldTs(a, 'status'), bt = _fieldTs(b, 'status');
+    let sd = 0;
+    if (_valEq(a.status, b.status)) {
+      sd = Math.max(Number(a.statusDate) || 0, Number(b.statusDate) || 0, at, bt);
+    } else {
+      const win = bt > at ? b : at > bt ? a
+        : ((Number(b.updated) || 0) > (Number(a.updated) || 0) ? b : a);
+      sd = Number(win.statusDate) || 0;
+    }
+    if (!sd) sd = Number(out.createdAt) || Number(out.updated) || Date.now();
+    out.statusDate = sd;
+    ft.status = sd;
   }
   if ('ratings' in out && out.ratings && Object.values(out.ratings).some(v => v > 0)) {
     const src = _valEq(out.ratings, a.ratings) ? a : b;
@@ -826,6 +847,7 @@ function mergeLibraries(localItems, localDel, cloudItems, cloudDel) {
     /* [SYNC-RESURRECT] Якщо тайтл додали/змінили після видалення —
        tombstone треба прибрати, інакше новий запис щоразу видаляється з хмари. */
     if (del[k] && wUpd > del[k]) delete del[k];
+    preserveItemTimestamps(win);
     items[k] = win;
   }
   return { items, deleted: del };
@@ -1363,9 +1385,12 @@ function migrateLegacyElo() {
 function preserveItemTimestamps(entry) {
   /* PRESERVE_TS_GUARD */
   if (!entry) return;
-  const fallbackTs = entry.statusDate || entry.createdAt || entry.updated || 0;
-  if (entry.status && !entry.statusDate && fallbackTs > 0) {
+  const statusTs = Number(entry.statusDate) || Number(entry._fieldTs && entry._fieldTs.status) || 0;
+  const fallbackTs = statusTs || Number(entry.createdAt) || Number(entry.updated) || 0;
+  if (entry.status && !statusTs && fallbackTs > 0) {
     entry.statusDate = fallbackTs;
+    if (!entry._fieldTs) entry._fieldTs = {};
+    entry._fieldTs.status = fallbackTs;
   }
   if (entry.type === 'movie' && computeAverage(entry.ratings) > 0 && !entry.ratingUpdated && fallbackTs > 0) {
     entry.ratingUpdated = fallbackTs;

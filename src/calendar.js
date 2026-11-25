@@ -4,6 +4,19 @@ const RELEASE_CACHE_KEY = 'mycinema.releaseCache.v1';
 const RELEASE_CACHE_TTL = 6 * 60 * 60 * 1000;
 let _releaseFetchRunning = false;
 
+/* [CAL-STATUS-TS] Дата, за якою тайтл потрапляє в календар.
+   Пріоритет: зафіксована дата статусу → createdAt → updated (лише якщо
+   інших дат немає). `updated` змінюється при будь-якій правці/підвантаженні
+   метаданих, тому не може слугувати датою статусу. */
+function calendarStatusTs(item) {
+  if (!item) return 0;
+  return Number(item.statusDate)
+    || Number(item._fieldTs && item._fieldTs.status)
+    || Number(item.createdAt)
+    || Number(item.updated)
+    || 0;
+}
+
 function readReleaseCache() {
   const raw = typeof mcCacheGet === 'function' ? mcCacheGet(RELEASE_CACHE_KEY, {}) : {};
   return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
@@ -259,12 +272,7 @@ function renderCalendar() {
     return;
   }
 
-  /* CAL_ITEM_TS_CLEAN */
-  const itemTs = (x) => {
-    if (x.statusDate) return x.statusDate;
-    if (x.createdAt) return x.createdAt;
-    return x.updated || 0;
-  };
+  const itemTs = calendarStatusTs;
   let allItems = Object.values(lib).filter(x => (x.status === 'watching' || x.status === 'watched') && itemTs(x) > 0);
 
   // Навіть якщо переглядів ще нема — даємо можливість переключитись на Графік релізів

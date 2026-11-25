@@ -101,6 +101,26 @@
     var titleEl = root.querySelector('.mc-pc-title');
     var idleTimer = null;
     var destroyed = false;
+    /* HLS з проксі росте разом із сегментами: video.duration спочатку показує
+       лише перші ~30 с. Якщо відома повна тривалість — малюємо її одразу. */
+    var fixedDuration = Number(opts.totalDuration) || 0;
+    /* Фрагментований MP4 з pipe не дає video.currentTime у повній шкалі часу
+       (після ?start= він знову починається з 0), тому тримаємо зсув окремо. */
+    var timeOffset = Number(opts.timeOffset) || 0;
+    var onSeek = typeof opts.onSeek === 'function' ? opts.onSeek : null;
+    var seekPreview = null;
+    function duration() { return fixedDuration > 0 ? fixedDuration : (video.duration || 0); }
+    function setTotalDuration(sec) {
+      sec = Number(sec) || 0;
+      // 0 (наприклад, під час тимчасової зміни src) не скидає відому повну тривалість
+      if (sec > 0) fixedDuration = sec;
+      if (typeof syncTime === 'function') syncTime();
+    }
+    function setTimeOffset(sec) {
+      timeOffset = Number(sec) > 0 ? Number(sec) : 0;
+      seekPreview = null;
+      if (typeof syncTime === 'function') syncTime();
+    }
 
     function setTitle(t) { titleEl.textContent = t || ''; }
 
@@ -119,14 +139,18 @@
       show();
     }
     function syncTime() {
-      var d = video.duration || 0, t = video.currentTime || 0;
+      var d = duration();
+      var now = video.currentTime || 0;
+      // одні збірки ffmpeg/браузерів віддають fMP4 вже з абсолютними timestamps
+      var offset = timeOffset > 0 && now >= timeOffset - 1 ? 0 : timeOffset;
+      var t = seekPreview !== null ? seekPreview : now + offset;
       timeEl.textContent = fmtTime(t) + ' / ' + (d ? fmtTime(d) : '—:——');
       if (d > 0) {
         seek.value = String(Math.round(t / d * 1000));
         played.style.width = (t / d * 100).toFixed(2) + '%';
       } else { seek.value = '0'; played.style.width = '0'; }
       if (d > 0 && video.buffered && video.buffered.length) {
-        var end = video.buffered.end(video.buffered.length - 1);
+        var end = video.buffered.end(video.buffered.length - 1) + offset;
         buffered.style.width = Math.min(100, end / d * 100).toFixed(2) + '%';
       }
     }
@@ -143,8 +167,26 @@
 
     playBtn.addEventListener('click', togglePlay);
     seek.addEventListener('input', function () {
-      var d = video.duration || 0;
-      if (d > 0) { try { video.currentTime = Number(seek.value) / 1000 * d; } catch (e) {} }
+      var d = duration();
+      if (d <= 0) return;
+      var target = Number(seek.value) / 1000 * d;
+      if (onSeek) {
+        /* Несекбаємий потік: показуємо прев'ю, а новий src ставимо тільки
+           після того, як користувач відпустив повзунок. */
+        seekPreview = target;
+        syncTime();
+      } else {
+        try { video.currentTime = target; } catch (e) {}
+      }
+      show();
+    });
+    seek.addEventListener('change', function () {
+      if (!onSeek) return;
+      var d = duration();
+      if (d <= 0) return;
+      var target = Number(seek.value) / 1000 * d;
+      seekPreview = null;
+      onSeek(target);
       show();
     });
     volInput.addEventListener('input', function () {
@@ -172,8 +214,17 @@
       var tag = (e.target && e.target.tagName) || '';
       if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
       if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); togglePlay(); }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); try { video.currentTime += 5; } catch (er) {} show(); }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); try { video.currentTime -= 5; } catch (er) {} show(); }
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        var now = video.currentTime || 0;
+        var offset = timeOffset > 0 && now >= timeOffset - 1 ? 0 : timeOffset;
+        var dd = duration();
+        var target = now + offset + (e.key === 'ArrowRight' ? 5 : -5);
+        if (dd > 0) target = Math.max(0, Math.min(dd - 1, target));
+        if (onSeek) onSeek(target);
+        else { try { video.currentTime = target - offset; } catch (er) {} }
+        show();
+      }
       else if (e.key.toLowerCase() === 'f' && opts.onFullscreen) { e.preventDefault(); opts.onFullscreen(); }
       else if (e.key.toLowerCase() === 'm' && opts.onMenu) { e.preventDefault(); opts.onMenu(); }
     };
@@ -183,6 +234,7 @@
     video.addEventListener('timeupdate', syncTime);
     video.addEventListener('progress', syncTime);
     video.addEventListener('loadedmetadata', syncTime);
+    video.addEventListener('durationchange', syncTime);
     video.addEventListener('volumechange', syncVol);
 
 
@@ -192,6 +244,8 @@
     return {
       root: root,
       setTitle: setTitle,
+      setTotalDuration: setTotalDuration,
+      setTimeOffset: setTimeOffset,
       show: show,
       hide: hide,
       destroy: function () {
