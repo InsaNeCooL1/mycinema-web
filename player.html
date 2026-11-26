@@ -80,7 +80,7 @@
 <body>
 <div id="stage">
   <div id="preload"><i></i></div>
-  <video id="video" autoplay playsinline></video>
+  <video id="video" playsinline></video>
   <div id="audio-wrap" hidden>
     <span>Озвучка:</span>
     <select id="audio-sel" aria-label="Вибір озвучки"></select>
@@ -129,6 +129,7 @@
   var loaderHidden = false;
   var hlsInstance = null, statsStarted = false, pendingSeek = 0;
   var streamStart = 0; // зсув часу для fMP4 з ?start=: video.currentTime рахується з 0
+  var absoluteTimestamps = false; // чи приходить fMP4 вже з абсолютними timestamps
 
   function isFragmented(u) {
     try { return /\/stream\/?$/.test(new URL(u || src, location.href).pathname); }
@@ -178,6 +179,7 @@
     var target = Math.max(0, Math.floor(sec));
     u.searchParams.set('start', String(target));
     streamStart = target;
+    absoluteTimestamps = false;
     loadUrl(u.href, false);
   }
 
@@ -302,32 +304,83 @@
     } catch (e) { return 0; }
   }
 
+  /* Після ?start= новий потік знову починається з 0. Не вмикаємо відтворення,
+     поки в буфері немає хоча б ~1.5 с: Chrome інакше стартує з першого
+     відеокадру до появи init-сегменту звуку і звук «відстає». */
+  function resumeWhenReady(play) {
+    if (!play) return;
+    var done = false, timer = null;
+    function cleanup() {
+      ['progress', 'canplay', 'canplaythrough', 'loadeddata'].forEach(function (ev) {
+        video.removeEventListener(ev, go);
+      });
+      clearTimeout(timer);
+    }
+    function go() {
+      if (done) return;
+      var ahead = 0;
+      try {
+        if (video.buffered && video.buffered.length) {
+          ahead = video.buffered.end(video.buffered.length - 1) - (video.currentTime || 0);
+        }
+      } catch (e) {}
+      if (video.readyState >= 4 || ahead >= 1.5) {
+        done = true; cleanup();
+        video.play().catch(function () {});
+      }
+    }
+    ['progress', 'canplay', 'canplaythrough', 'loadeddata'].forEach(function (ev) {
+      video.addEventListener(ev, go);
+    });
+    timer = setTimeout(function () {
+      if (done) return;
+      done = true; cleanup();
+      video.play().catch(function () {});
+    }, 3000);
+  }
+
+  function detectTimeBase() {
+    if (!controls || typeof controls.setTimeOffset !== 'function') return;
+    absoluteTimestamps = (video.currentTime || 0) >= streamStart - 1;
+    controls.setTimeOffset(streamStart, absoluteTimestamps);
+  }
+
   function loadUrl(url, keepTime) {
+    var wasPlaying = !video.paused;
     try { pendingSeek = keepTime ? (video.currentTime || 0) : 0; } catch (e) { pendingSeek = 0; }
     var fragNext = isFragmented(url);
     if (fragNext && keepTime) {
       try {
         var u = new URL(url, location.href);
-        var at = Math.floor(streamStart + (video.currentTime || 0));
+        var at = absoluteTimestamps
+          ? Math.floor(video.currentTime || 0)
+          : Math.floor(streamStart + (video.currentTime || 0));
         u.searchParams.set('start', String(Math.max(0, at)));
         url = u.href;
       } catch (e) {}
     }
     src = url;
     if (fragNext) streamStart = startOf(src);
+    absoluteTimestamps = false;
     if (controls) {
-      if (typeof controls.setTimeOffset === 'function') controls.setTimeOffset(fragNext ? streamStart : 0);
+      if (typeof controls.setTimeOffset === 'function') controls.setTimeOffset(fragNext ? streamStart : 0, false);
       if (typeof controls.setTotalDuration === 'function') controls.setTotalDuration(sourceDuration(src));
     }
     if (hlsInstance && !fragNext) {
       hlsInstance.loadSource(src);
     } else {
       if (hlsInstance) { try { hlsInstance.destroy(); } catch (e) {} hlsInstance = null; }
+      /* Присвоєння src саме запускає завантаження; явний load() скасовував його
+         і робив другий запит до транскодера на кожну перемотку. */
       video.src = src;
-      video.load();
     }
-    video.play().catch(function () {});
-    if (fragNext) resolveFragmentedDuration();
+    if (fragNext) {
+      video.addEventListener('loadedmetadata', detectTimeBase, { once: true });
+      resumeWhenReady(wasPlaying);
+      resolveFragmentedDuration();
+    } else if (wasPlaying) {
+      video.play().catch(function () {});
+    }
   }
 
   function loadVariant(v, keepTime) {
@@ -483,18 +536,20 @@
      перевіряє CORS. Тривалість і перемотку малюємо самі. */
   function startFragmented() {
     streamStart = startOf(src);
+    absoluteTimestamps = false;
     video.src = src;
     if (variants[0]) { desiredAudioLang = variants[0].audioLang || ''; setTitle(variants[0]); }
     mountUI();
-    if (controls && typeof controls.setTimeOffset === 'function') controls.setTimeOffset(streamStart);
+    if (controls && typeof controls.setTimeOffset === 'function') controls.setTimeOffset(streamStart, false);
     video.addEventListener('error', function () { showLoaderError('Не вдалося відкрити потік'); });
     video.addEventListener('loadedmetadata', function () {
       // video.duration для fMP4 з pipe показує лише завантажену частину —
       // повертаємо відому повну тривалість після кожного перезавантаження src
       if (sourceDuration(src) > 0 && controls) controls.setTotalDuration(sourceDuration(src));
-      video.play().catch(function () {});
+      detectTimeBase();
+      resumeWhenReady(true);
       initStats();
-    });
+    }, { once: true });
     resolveFragmentedDuration();
   }
 

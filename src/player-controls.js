@@ -107,6 +107,7 @@
     /* Фрагментований MP4 з pipe не дає video.currentTime у повній шкалі часу
        (після ?start= він знову починається з 0), тому тримаємо зсув окремо. */
     var timeOffset = Number(opts.timeOffset) || 0;
+    var absoluteTime = false;
     var onSeek = typeof opts.onSeek === 'function' ? opts.onSeek : null;
     var seekPreview = null;
     function duration() { return fixedDuration > 0 ? fixedDuration : (video.duration || 0); }
@@ -116,11 +117,17 @@
       if (sec > 0) fixedDuration = sec;
       if (typeof syncTime === 'function') syncTime();
     }
-    function setTimeOffset(sec) {
+    function setTimeOffset(sec, absolute) {
       timeOffset = Number(sec) > 0 ? Number(sec) : 0;
+      absoluteTime = !!absolute;
       seekPreview = null;
       if (typeof syncTime === 'function') syncTime();
     }
+    /* fMP4 з pipe зазвичай рахує currentTime від 0 після ?start=, але деякі
+       збірки ffmpeg віддають вже абсолютні timestamps. Визначаємо це один раз
+       на loadedmetadata і не перемикаємо на кожному timeupdate: інакше після
+       streamStart секунд відтворення час і ціль seek стрибають назад. */
+    function absOffset() { return absoluteTime ? 0 : timeOffset; }
 
     function setTitle(t) { titleEl.textContent = t || ''; }
 
@@ -141,8 +148,7 @@
     function syncTime() {
       var d = duration();
       var now = video.currentTime || 0;
-      // одні збірки ffmpeg/браузерів віддають fMP4 вже з абсолютними timestamps
-      var offset = timeOffset > 0 && now >= timeOffset - 1 ? 0 : timeOffset;
+      var offset = absOffset();
       var t = seekPreview !== null ? seekPreview : now + offset;
       timeEl.textContent = fmtTime(t) + ' / ' + (d ? fmtTime(d) : '—:——');
       if (d > 0) {
@@ -217,7 +223,7 @@
       else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         e.preventDefault();
         var now = video.currentTime || 0;
-        var offset = timeOffset > 0 && now >= timeOffset - 1 ? 0 : timeOffset;
+        var offset = absOffset();
         var dd = duration();
         var target = now + offset + (e.key === 'ArrowRight' ? 5 : -5);
         if (dd > 0) target = Math.max(0, Math.min(dd - 1, target));

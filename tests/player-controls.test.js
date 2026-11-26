@@ -33,4 +33,19 @@ describe('MCPlayerControls', () => {
     c.destroy();
     expect(host.querySelector('.mc-pc')).toBeNull();
   });
+
+  it('не скидає зсув ?start= після того, як currentTime його переріс', () => {
+    const c = window.MCPlayerControls.mount({
+      host, video, title: 'Тест', totalDuration: 90, timeOffset: 28,
+      onSeek: () => {}
+    });
+    const time = host.querySelector('.mc-pc-time');
+    Object.defineProperty(video, 'currentTime', { configurable: true, writable: true, value: 30 });
+    video.dispatchEvent(new Event('timeupdate'));
+    expect(time.textContent).toBe('0:58 / 1:30');
+
+    c.setTimeOffset(28, true);
+    expect(time.textContent).toBe('0:30 / 1:30');
+    c.destroy();
+  });
 });
