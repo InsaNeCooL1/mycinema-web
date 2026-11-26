@@ -2,15 +2,18 @@
 
 - Працюємо локально: **нічого не пушити в git без явного доручення**.
 - Після змін у `src/*.js` або `styles/*.css` перезбирати `bundle.js` і `styles.css`:
-  `npm run build`.
-- Перевірка перед завершенням: `npm test` (Vitest).
+  `corepack npm run build` (звичайного `npm` у PATH немає; corepack дає npm 12).
+- Перевірка перед завершенням: `corepack npm test` (Vitest).
 - `bundle.js` і `styles.css` — згенеровані файли, редагувати треба джерела в
   `src/` і `styles/`.
-- Оточення: Crostini на Chromebook, Debian arm64. Node.js 22 встановлено
-  з офіційного tarball (apt дає застарілу версію для Vitest 5).
-- Локальний перегляд: `http://100.115.92.26:8080/`
-  (systemd-юніт `mycinema-8080.service`, автозапуск увімкнено).
-- З браузера Chromebook'а використовувати IP контейнера, а не `localhost`.
+- Оточення: повноцінний ARM Debian (aarch64, Debian forky/sid), не Crostini.
+  Node.js 24.22.2 встановлено з apt (`/usr/bin/node`); npm у PATH відсутній —
+  використовувати `corepack npm`.
+- Локальний перегляд: `http://192.168.31.110:8080/`
+  (IP на wlan0 з DHCP — перевіряти `hostname -I`). Сервіс
+  `mycinema-8080.service` — користувацький systemd-юніт, автозапуск увімкнено,
+  слухає `0.0.0.0:8080`, роздає каталог проєкту.
+- З іншого пристрою в мережі використовувати IP машини, а не `localhost`.
 - **Ніколи не згадувати в повідомленнях комітів** TorrServer, онлайн-плеєри,
   балансери, торренти, стрімінг і подібні деталі. Використовувати нейтральні
   описи на кшталт `FIX: misc local improvements`.
